@@ -72,6 +72,23 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Run automated tests
+
+Run all tests:
+
+```bash
+source .venv/bin/activate
+pytest
+```
+
+Run specific groups:
+
+```bash
+pytest tests/unit
+pytest tests/integration
+pytest tests/smoke
+```
+
 ### Run the 3 backend services
 
 Open 3 terminals (or run in the background). Each backend runs the same code, but on a different port + name.

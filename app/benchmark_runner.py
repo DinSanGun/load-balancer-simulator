@@ -5,7 +5,7 @@ import csv
 import json
 import os
 from dataclasses import asdict
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 import subprocess
 import time
@@ -125,7 +125,7 @@ def run_benchmarks(
 
     strategy_summaries = [_aggregate_runs(strategy, runs) for strategy, runs in all_results.items()]
     return {
-        "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "scenario": {
             "total_requests_per_run": total_requests,
             "concurrency": concurrency,
