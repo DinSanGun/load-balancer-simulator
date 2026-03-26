@@ -10,7 +10,11 @@ It focuses on understanding how different load balancing strategies affect perfo
 ## MVP (Implemented)
 
 - 3 backend services (FastAPI)
-  - `GET /` returns a message identifying the server (with a small random delay)
+  - `GET /` returns a message identifying the server
+  - Supports configurable behavior simulation:
+    - fixed delay (ms)
+    - random jitter (ms)
+    - failure rate (0.0 to 1.0)
   - `GET /health` returns status OK
 - 1 load balancer service (FastAPI)
   - `GET /` forwards requests to backends using HTTP (`requests`)
@@ -50,7 +54,7 @@ It focuses on understanding how different load balancing strategies affect perfo
 
 ### Project Structure
 
-- `app/config.py`: backend list + simple settings (ports, delays, timeouts)
+- `app/config.py`: backend list + simple settings + backend behavior config
 - `app/backend_server.py`: backend FastAPI service (`GET /` and `GET /health`)
 - `app/load_balancer.py`: load balancer FastAPI service (`GET /` forwards to backends)
 - `app/healthcheck.py`: TCP health check logic (socket connect)
@@ -91,6 +95,40 @@ Terminal 3:
 ```bash
 source .venv/bin/activate
 BACKEND_NAME=backend-3 uvicorn app.backend_server:app --host 127.0.0.1 --port 8003
+```
+
+#### Optional backend behavior configuration
+
+Each backend can simulate:
+- fixed delay in milliseconds
+- additional random jitter in milliseconds
+- failure rate between `0.0` and `1.0`
+
+Global env vars (applies to all backends):
+- `BACKEND_FIXED_DELAY_MS`
+- `BACKEND_JITTER_MS`
+- `BACKEND_FAILURE_RATE`
+
+Backend-specific env vars (override global values):
+- `BACKEND_1_FIXED_DELAY_MS`, `BACKEND_1_JITTER_MS`, `BACKEND_1_FAILURE_RATE`
+- `BACKEND_2_FIXED_DELAY_MS`, `BACKEND_2_JITTER_MS`, `BACKEND_2_FAILURE_RATE`
+- `BACKEND_3_FIXED_DELAY_MS`, `BACKEND_3_JITTER_MS`, `BACKEND_3_FAILURE_RATE`
+
+Example with different behavior per backend:
+
+```bash
+# backend-1: fast and stable
+BACKEND_NAME=backend-1 BACKEND_1_FIXED_DELAY_MS=80 BACKEND_1_JITTER_MS=20 BACKEND_1_FAILURE_RATE=0.00 uvicorn app.backend_server:app --host 127.0.0.1 --port 8001
+```
+
+```bash
+# backend-2: slower but stable
+BACKEND_NAME=backend-2 BACKEND_2_FIXED_DELAY_MS=350 BACKEND_2_JITTER_MS=120 BACKEND_2_FAILURE_RATE=0.00 uvicorn app.backend_server:app --host 127.0.0.1 --port 8002
+```
+
+```bash
+# backend-3: medium speed with occasional failures
+BACKEND_NAME=backend-3 BACKEND_3_FIXED_DELAY_MS=180 BACKEND_3_JITTER_MS=80 BACKEND_3_FAILURE_RATE=0.10 uvicorn app.backend_server:app --host 127.0.0.1 --port 8003
 ```
 
 Quick checks:
@@ -219,6 +257,19 @@ The benchmark summary includes, per strategy:
 - average/min/max response time
 - average throughput
 - backend request distribution
+
+### Example benchmark scenarios
+
+Scenario A (one clearly fastest backend):
+- backend-1: low delay, no failures
+- backend-2: high delay, no failures
+- backend-3: medium delay, no failures
+- useful for observing `least_response_time`
+
+Scenario B (one unstable backend):
+- backend-1 and backend-2: stable
+- backend-3: non-zero failure rate (for example `0.10`)
+- useful for comparing how strategies behave when one backend intermittently fails
 
 Now send requests to the load balancer:
 

@@ -1,0 +1,4 @@
+strategy,repetitions,total_requests,successful_requests,failed_requests,average_response_time_ms,min_response_time_ms,max_response_time_ms,average_throughput_rps,requests_per_backend
+round_robin,1,150,141,9,372.015,86.462,793.313,7.94,"{""backend-1"": 50, ""backend-2"": 50, ""backend-3"": 50}"
+least_connections,1,150,143,7,334.958,60.098,799.825,8.786,"{""backend-1"": 37, ""backend-2"": 40, ""backend-3"": 73}"
+least_response_time,1,150,141,9,255.378,74.804,663.611,11.644,"{""backend-1"": 13, ""backend-2"": 13, ""backend-3"": 124}"
