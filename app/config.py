@@ -38,7 +38,7 @@ TCP_CONNECT_TIMEOUT_SECONDS = 0.2
 
 # Backend "work" simulation (random delay bounds).
 BACKEND_MIN_DELAY_SECONDS = 0.05
-BACKEND_MAX_DELAY_SECONDS = 0.25
+BACKEND_MAX_DELAY_SECONDS = 0.8
 
 
 # Active load-balancing strategy.

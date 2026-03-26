@@ -74,6 +74,7 @@ class LeastConnectionsStrategy(LoadBalancingStrategy):
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._active_counts: dict[str, int] = {}
+        self._tie_break_idx = 0
 
     def choose_backend(self, backends: list[Backend]) -> Backend:
         if not backends:
@@ -82,7 +83,12 @@ class LeastConnectionsStrategy(LoadBalancingStrategy):
         with self._lock:
             for b in backends:
                 self._active_counts.setdefault(b.name, 0)
-            return min(backends, key=lambda b: (self._active_counts.get(b.name, 0), b.name))
+            min_count = min(self._active_counts.get(b.name, 0) for b in backends)
+            candidates = [b for b in backends if self._active_counts.get(b.name, 0) == min_count]
+            # Tie-break in round-robin order so equal-count backends rotate.
+            backend = candidates[self._tie_break_idx % len(candidates)]
+            self._tie_break_idx = (self._tie_break_idx + 1) % max(1, len(candidates))
+            return backend
 
     def on_request_start(self, backend: Backend) -> object | None:
         with self._lock:
@@ -117,16 +123,28 @@ class LeastResponseTimeStrategy(LoadBalancingStrategy):
         self._avg_seconds: dict[str, float] = {}
         self._counts: dict[str, int] = {}
         self._cold_start_idx = 0
+        self._request_count = 0
+        self._probe_every = 5
+        self._probe_idx = 0
 
     def choose_backend(self, backends: list[Backend]) -> Backend:
         if not backends:
             raise ValueError("No backends available")
 
         with self._lock:
+            self._request_count += 1
+
             unknown = [b for b in backends if b.name not in self._avg_seconds]
             if unknown:
                 backend = unknown[self._cold_start_idx % len(unknown)]
                 self._cold_start_idx = (self._cold_start_idx + 1) % max(1, len(unknown))
+                return backend
+
+            # Light exploration: every Nth request, probe another backend so
+            # averages can adapt if runtime conditions change.
+            if self._request_count % self._probe_every == 0:
+                backend = backends[self._probe_idx % len(backends)]
+                self._probe_idx = (self._probe_idx + 1) % len(backends)
                 return backend
 
             return min(backends, key=lambda b: (self._avg_seconds.get(b.name, float("inf")), b.name))
