@@ -7,7 +7,18 @@ A Python FastAPI-based cloud load balancer simulator designed to compare differe
 This project simulates a cloud-style load balancer that distributes HTTP requests across multiple backend service instances.  
 It focuses on understanding how different load balancing strategies affect performance and resource utilization.
 
-## Features (Planned)
+## MVP (Implemented)
+
+- 3 backend services (FastAPI)
+  - `GET /` returns a message identifying the server (with a small random delay)
+  - `GET /health` returns status OK
+- 1 load balancer service (FastAPI)
+  - `GET /` forwards requests to backends using HTTP (`requests`)
+  - Round Robin routing (single strategy for now)
+  - TCP reachability health checks (Python sockets) to skip unhealthy backends
+  - Logs which backend handled each request
+
+## Features (Planned / Later)
 
 - Multiple backend services (FastAPI)
 - Load balancer with support for:
@@ -32,7 +43,83 @@ It focuses on understanding how different load balancing strategies affect perfo
 
 ## Getting Started
 
-Project setup and run instructions will be added as development progresses.
+### Project Structure
+
+- `app/config.py`: backend list + simple settings (ports, delays, timeouts)
+- `app/backend_server.py`: backend FastAPI service (`GET /` and `GET /health`)
+- `app/load_balancer.py`: load balancer FastAPI service (`GET /` forwards to backends)
+- `app/healthcheck.py`: TCP health check logic (socket connect)
+- `app/round_robin.py`: round-robin selector
+
+### Setup
+
+Create a virtual environment and install dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Run the 3 backend services
+
+Open 3 terminals (or run in the background). Each backend runs the same code, but on a different port + name.
+
+Terminal 1:
+
+```bash
+source .venv/bin/activate
+BACKEND_NAME=backend-1 uvicorn app.backend_server:app --host 127.0.0.1 --port 8001
+```
+
+Terminal 2:
+
+```bash
+source .venv/bin/activate
+BACKEND_NAME=backend-2 uvicorn app.backend_server:app --host 127.0.0.1 --port 8002
+```
+
+Terminal 3:
+
+```bash
+source .venv/bin/activate
+BACKEND_NAME=backend-3 uvicorn app.backend_server:app --host 127.0.0.1 --port 8003
+```
+
+Quick checks:
+
+```bash
+curl http://127.0.0.1:8001/
+curl http://127.0.0.1:8002/health
+```
+
+### Run the load balancer
+
+In a 4th terminal:
+
+```bash
+source .venv/bin/activate
+uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+```
+
+Now send requests to the load balancer:
+
+```bash
+curl -i http://127.0.0.1:8000/
+curl -i http://127.0.0.1:8000/
+curl -i http://127.0.0.1:8000/
+```
+
+You should see:
+- Requests rotate between `backend-1`, `backend-2`, `backend-3` (round robin)
+- Response header `X-Backend` telling you which backend was chosen
+- Load balancer logs printing which backend handled each request
+
+### How the key parts work (in plain terms)
+
+- **HTTP forwarding**: the load balancer receives your `GET /`, then makes its own `GET /` HTTP request to a chosen backend using `requests.get(...)`, and returns the backend’s JSON response back to you.
+- **TCP health checks**: before choosing a backend, the load balancer tries to open a TCP connection to each backend’s `(host, port)` using `socket.create_connection(...)`. If it can connect, that backend is considered reachable.
+- **Round robin**: the load balancer keeps an internal index pointing to “who’s next”. Every request uses the next backend in the list and then increments the index (wrapping around at the end).
 
 ## Goals
 
