@@ -14,7 +14,10 @@ It focuses on understanding how different load balancing strategies affect perfo
   - `GET /health` returns status OK
 - 1 load balancer service (FastAPI)
   - `GET /` forwards requests to backends using HTTP (`requests`)
-  - Round Robin routing (single strategy for now)
+  - Strategy-based routing:
+    - Round Robin
+    - Least Connections
+    - Least Response Time
   - TCP reachability health checks (Python sockets) to skip unhealthy backends
   - Logs which backend handled each request
 
@@ -49,7 +52,7 @@ It focuses on understanding how different load balancing strategies affect perfo
 - `app/backend_server.py`: backend FastAPI service (`GET /` and `GET /health`)
 - `app/load_balancer.py`: load balancer FastAPI service (`GET /` forwards to backends)
 - `app/healthcheck.py`: TCP health check logic (socket connect)
-- `app/round_robin.py`: round-robin selector
+- `app/strategies.py`: strategy abstraction + all strategy implementations
 
 ### Setup
 
@@ -102,6 +105,23 @@ source .venv/bin/activate
 uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
 ```
 
+Or choose a strategy explicitly:
+
+```bash
+source .venv/bin/activate
+LB_STRATEGY=round_robin uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+```
+
+```bash
+source .venv/bin/activate
+LB_STRATEGY=least_connections uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+```
+
+```bash
+source .venv/bin/activate
+LB_STRATEGY=least_response_time uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+```
+
 Now send requests to the load balancer:
 
 ```bash
@@ -120,6 +140,8 @@ You should see:
 - **HTTP forwarding**: the load balancer receives your `GET /`, then makes its own `GET /` HTTP request to a chosen backend using `requests.get(...)`, and returns the backend’s JSON response back to you.
 - **TCP health checks**: before choosing a backend, the load balancer tries to open a TCP connection to each backend’s `(host, port)` using `socket.create_connection(...)`. If it can connect, that backend is considered reachable.
 - **Round robin**: the load balancer keeps an internal index pointing to “who’s next”. Every request uses the next backend in the list and then increments the index (wrapping around at the end).
+- **Least connections**: the load balancer tracks active request counts per backend, picks the one with the smallest count, increments before forwarding, and decrements when the request finishes or fails.
+- **Least response time**: the load balancer measures backend response durations and keeps a simple running average per backend, then picks the backend with the lowest average response time.
 
 ## Goals
 

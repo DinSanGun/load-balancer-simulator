@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 
 
 @dataclass(frozen=True)
@@ -38,3 +39,11 @@ TCP_CONNECT_TIMEOUT_SECONDS = 0.2
 # Backend "work" simulation (random delay bounds).
 BACKEND_MIN_DELAY_SECONDS = 0.05
 BACKEND_MAX_DELAY_SECONDS = 0.25
+
+
+# Active load-balancing strategy.
+# Supported values:
+# - "round_robin"
+# - "least_connections"
+# - "least_response_time"
+LOAD_BALANCING_STRATEGY = os.getenv("LB_STRATEGY", "round_robin").strip().lower()

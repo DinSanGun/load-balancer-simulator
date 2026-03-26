@@ -6,16 +6,17 @@ import requests
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from .config import BACKENDS, Backend
+from .config import BACKENDS, Backend, LOAD_BALANCING_STRATEGY
 from .healthcheck import filter_healthy_backends
-from .round_robin import RoundRobin
+from .strategies import LoadBalancingStrategy, build_strategy
 
 
 logger = logging.getLogger("load_balancer")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 app = FastAPI(title="Load Balancer (MVP)")
-rr = RoundRobin()
+strategy: LoadBalancingStrategy = build_strategy(LOAD_BALANCING_STRATEGY)
+logger.info("Active strategy: %s", LOAD_BALANCING_STRATEGY)
 
 
 def _forward_get_root(backend: Backend) -> tuple[int, dict[str, object]]:
@@ -43,11 +44,11 @@ def _forward_get_root(backend: Backend) -> tuple[int, dict[str, object]]:
 @app.get("/")
 def root() -> JSONResponse:
     """
-    Route one request using Round Robin over healthy backends.
+    Route one request over healthy backends using configured strategy.
 
     - First, do a *TCP* health check for each backend (socket connect).
     - Keep only healthy ones.
-    - Select the next backend using round robin.
+    - Select one backend using the chosen strategy.
     - Forward the HTTP request to that backend.
     - Log which backend handled it.
     """
@@ -59,18 +60,22 @@ def root() -> JSONResponse:
             content={"error": "No healthy backends available"},
         )
 
-    backend = rr.next(healthy)
+    backend = strategy.choose_backend(healthy)
+    request_ctx = strategy.on_request_start(backend)
 
     try:
         status_code, payload = _forward_get_root(backend)
     except requests.RequestException as e:
         # A backend can become unreachable between the TCP check and the HTTP call.
         # Keep the MVP behavior simple: return a 502.
+        strategy.on_request_end(backend, request_ctx, success=False)
         logger.warning("Forwarding failed to %s (%s:%s): %s", backend.name, backend.host, backend.port, e)
         return JSONResponse(
             status_code=502,
             content={"error": "Backend request failed", "backend": backend.name},
         )
+    else:
+        strategy.on_request_end(backend, request_ctx, success=True)
 
     logger.info("Routed request to %s (%s:%s)", backend.name, backend.host, backend.port)
 
