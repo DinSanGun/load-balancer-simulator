@@ -56,6 +56,7 @@ It focuses on understanding how different load balancing strategies affect perfo
 - `app/healthcheck.py`: TCP health check logic (socket connect)
 - `app/strategies.py`: strategy abstraction + all strategy implementations
 - `app/client_simulator.py`: sends requests + collects and saves metrics
+- `app/benchmark_runner.py`: runs all strategies under same scenario and saves comparison files
 
 ### Setup
 
@@ -131,7 +132,7 @@ Run the simulator from the project root (with backend services + load balancer r
 
 ```bash
 source .venv/bin/activate
-python -m app.client_simulator --requests 200 --url http://127.0.0.1:8000/ --strategy-label round_robin
+python -m app.client_simulator --requests 200 --concurrency 1 --url http://127.0.0.1:8000/ --strategy-label round_robin
 ```
 
 What it collects per run:
@@ -141,6 +142,7 @@ What it collects per run:
 - average response time (ms)
 - min response time (ms)
 - max response time (ms)
+- throughput (requests / second)
 - requests handled per backend server
 
 Output:
@@ -173,6 +175,38 @@ python -m app.client_simulator --requests 200 --strategy-label least_connections
 LB_STRATEGY=least_response_time uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
 python -m app.client_simulator --requests 200 --strategy-label least_response_time
 ```
+
+### Benchmark all strategies (same workload)
+
+Use the benchmark runner to execute:
+- `round_robin`
+- `least_connections`
+- `least_response_time`
+
+with the same request count, concurrency, path, and timeout.
+
+Important:
+- Keep backend servers running (`8001`, `8002`, `8003`)
+- Do not run another load balancer manually on benchmark host/port (`127.0.0.1:8000` by default), because the runner starts/stops it per strategy.
+
+Example:
+
+```bash
+source .venv/bin/activate
+python -m app.benchmark_runner --requests 300 --concurrency 5 --path / --timeout 3.0 --repetitions 2
+```
+
+Benchmark outputs:
+- JSON summary: `results/benchmark_summary_*.json`
+- CSV comparison: `results/benchmark_comparison_*.csv`
+
+The benchmark summary includes, per strategy:
+- total requests
+- successful requests
+- failed requests
+- average/min/max response time
+- average throughput
+- backend request distribution
 
 Now send requests to the load balancer:
 
