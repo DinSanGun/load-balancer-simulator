@@ -1,0 +1,16 @@
+{
+  "total_requests": 200,
+  "successful_requests": 200,
+  "failed_requests": 0,
+  "average_response_time_ms": 396.844,
+  "min_response_time_ms": 56.186,
+  "max_response_time_ms": 805.987,
+  "requests_per_backend": {
+    "backend-2": 174,
+    "backend-3": 13,
+    "backend-1": 13
+  },
+  "target_url": "http://127.0.0.1:8000/",
+  "strategy_label": "round_robin",
+  "generated_at": "2026-03-26T17:09:14Z"
+}

@@ -20,6 +20,10 @@ It focuses on understanding how different load balancing strategies affect perfo
     - Least Response Time
   - TCP reachability health checks (Python sockets) to skip unhealthy backends
   - Logs which backend handled each request
+- 1 client simulator script
+  - Sends configurable number of `GET /` requests to the load balancer
+  - Collects basic performance metrics
+  - Saves simulation output to `results/*.json`
 
 ## Features (Planned / Later)
 
@@ -30,12 +34,10 @@ It focuses on understanding how different load balancing strategies affect perfo
   - Least Response Time
 - HTTP request forwarding
 - TCP-based health checks for backend availability
-- Client simulator for generating high request loads
 - Performance metrics:
   - Response time
-  - Throughput
   - Load distribution per instance
-- Results export (CSV / JSON)
+- Results export (JSON)
 
 ## Technologies
 
@@ -53,6 +55,7 @@ It focuses on understanding how different load balancing strategies affect perfo
 - `app/load_balancer.py`: load balancer FastAPI service (`GET /` forwards to backends)
 - `app/healthcheck.py`: TCP health check logic (socket connect)
 - `app/strategies.py`: strategy abstraction + all strategy implementations
+- `app/client_simulator.py`: sends requests + collects and saves metrics
 
 ### Setup
 
@@ -120,6 +123,55 @@ LB_STRATEGY=least_connections uvicorn app.load_balancer:app --host 127.0.0.1 --p
 ```bash
 source .venv/bin/activate
 LB_STRATEGY=least_response_time uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+```
+
+### Run the client simulator
+
+Run the simulator from the project root (with backend services + load balancer running):
+
+```bash
+source .venv/bin/activate
+python -m app.client_simulator --requests 200 --url http://127.0.0.1:8000/ --strategy-label round_robin
+```
+
+What it collects per run:
+- total requests
+- successful requests
+- failed requests
+- average response time (ms)
+- min response time (ms)
+- max response time (ms)
+- requests handled per backend server
+
+Output:
+- prints a summary in console
+- writes one JSON file to `results/` (for example: `results/simulation_round_robin_YYYYMMDD_HHMMSS.json`)
+
+### Compare strategies (run one at a time)
+
+1. Start backend services (`8001`, `8002`, `8003`)
+2. Start load balancer with one strategy (example below)
+3. Run simulator and save results with matching `--strategy-label`
+4. Stop load balancer, restart with another strategy, repeat
+
+Example strategy runs:
+
+```bash
+# Round Robin
+LB_STRATEGY=round_robin uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+python -m app.client_simulator --requests 200 --strategy-label round_robin
+```
+
+```bash
+# Least Connections
+LB_STRATEGY=least_connections uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+python -m app.client_simulator --requests 200 --strategy-label least_connections
+```
+
+```bash
+# Least Response Time
+LB_STRATEGY=least_response_time uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+python -m app.client_simulator --requests 200 --strategy-label least_response_time
 ```
 
 Now send requests to the load balancer:
