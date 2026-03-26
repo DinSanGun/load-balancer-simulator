@@ -99,6 +99,7 @@ def run_benchmarks(
     repetitions: int,
     host: str,
     port: int,
+    progress_every: int,
 ) -> dict[str, object]:
     target_url = _build_target_url(host, port, path)
     all_results: dict[str, list[SimulationResult]] = {s: [] for s in STRATEGIES}
@@ -114,6 +115,8 @@ def run_benchmarks(
                     target_url=target_url,
                     timeout_seconds=timeout,
                     concurrency=concurrency,
+                    progress_every=progress_every,
+                    progress_label=f"{strategy} rep {rep}/{repetitions}",
                 )
                 result.strategy_label = strategy
                 all_results[strategy].append(result)
@@ -191,6 +194,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repetitions", type=int, default=1, help="Runs per strategy (default: 1)")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Load balancer host (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Load balancer port (default: 8000)")
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=100,
+        help="Print progress every N completed requests per run (0 disables, default: 100)",
+    )
     return parser.parse_args()
 
 
@@ -202,6 +211,8 @@ def main() -> None:
         raise ValueError("--concurrency must be > 0")
     if args.repetitions <= 0:
         raise ValueError("--repetitions must be > 0")
+    if args.progress_every < 0:
+        raise ValueError("--progress-every must be 0 or greater")
 
     summary = run_benchmarks(
         total_requests=args.requests,
@@ -211,6 +222,7 @@ def main() -> None:
         repetitions=args.repetitions,
         host=args.host,
         port=args.port,
+        progress_every=args.progress_every,
     )
     json_path, csv_path = save_outputs(summary)
 

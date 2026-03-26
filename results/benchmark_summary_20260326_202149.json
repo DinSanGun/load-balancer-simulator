@@ -1,0 +1,178 @@
+{
+  "generated_at": "2026-03-26T18:21:49Z",
+  "scenario": {
+    "total_requests_per_run": 70,
+    "concurrency": 3,
+    "path": "/",
+    "timeout_seconds": 3.0,
+    "repetitions_per_strategy": 2,
+    "target_host": "127.0.0.1",
+    "target_port": 8000
+  },
+  "strategies": [
+    {
+      "strategy": "round_robin",
+      "repetitions": 2,
+      "total_requests": 140,
+      "successful_requests": 140,
+      "failed_requests": 0,
+      "average_response_time_ms": 434.01,
+      "min_response_time_ms": 61.569,
+      "max_response_time_ms": 798.1,
+      "average_throughput_rps": 6.818,
+      "requests_per_backend": {
+        "backend-3": 47,
+        "backend-1": 46,
+        "backend-2": 47
+      }
+    },
+    {
+      "strategy": "least_connections",
+      "repetitions": 2,
+      "total_requests": 140,
+      "successful_requests": 140,
+      "failed_requests": 0,
+      "average_response_time_ms": 439.844,
+      "min_response_time_ms": 62.441,
+      "max_response_time_ms": 803.608,
+      "average_throughput_rps": 6.686,
+      "requests_per_backend": {
+        "backend-2": 46,
+        "backend-1": 46,
+        "backend-3": 48
+      }
+    },
+    {
+      "strategy": "least_response_time",
+      "repetitions": 2,
+      "total_requests": 140,
+      "successful_requests": 140,
+      "failed_requests": 0,
+      "average_response_time_ms": 470.206,
+      "min_response_time_ms": 58.206,
+      "max_response_time_ms": 802.877,
+      "average_throughput_rps": 6.25,
+      "requests_per_backend": {
+        "backend-2": 42,
+        "backend-3": 63,
+        "backend-1": 35
+      }
+    }
+  ],
+  "raw_runs": {
+    "round_robin": [
+      {
+        "total_requests": 70,
+        "successful_requests": 70,
+        "failed_requests": 0,
+        "average_response_time_ms": 404.287,
+        "min_response_time_ms": 61.569,
+        "max_response_time_ms": 791.686,
+        "total_duration_seconds": 9.613,
+        "throughput_rps": 7.282,
+        "requests_per_backend": {
+          "backend-3": 23,
+          "backend-1": 23,
+          "backend-2": 24
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "round_robin",
+        "generated_at": "2026-03-26T18:20:48Z"
+      },
+      {
+        "total_requests": 70,
+        "successful_requests": 70,
+        "failed_requests": 0,
+        "average_response_time_ms": 463.733,
+        "min_response_time_ms": 79.91,
+        "max_response_time_ms": 798.1,
+        "total_duration_seconds": 11.017,
+        "throughput_rps": 6.354,
+        "requests_per_backend": {
+          "backend-2": 23,
+          "backend-3": 24,
+          "backend-1": 23
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "round_robin",
+        "generated_at": "2026-03-26T18:21:01Z"
+      }
+    ],
+    "least_connections": [
+      {
+        "total_requests": 70,
+        "successful_requests": 70,
+        "failed_requests": 0,
+        "average_response_time_ms": 438.572,
+        "min_response_time_ms": 62.441,
+        "max_response_time_ms": 803.608,
+        "total_duration_seconds": 10.545,
+        "throughput_rps": 6.638,
+        "requests_per_backend": {
+          "backend-2": 25,
+          "backend-1": 21,
+          "backend-3": 24
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_connections",
+        "generated_at": "2026-03-26T18:21:13Z"
+      },
+      {
+        "total_requests": 70,
+        "successful_requests": 70,
+        "failed_requests": 0,
+        "average_response_time_ms": 441.115,
+        "min_response_time_ms": 77.876,
+        "max_response_time_ms": 802.517,
+        "total_duration_seconds": 10.396,
+        "throughput_rps": 6.734,
+        "requests_per_backend": {
+          "backend-1": 25,
+          "backend-2": 21,
+          "backend-3": 24
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_connections",
+        "generated_at": "2026-03-26T18:21:24Z"
+      }
+    ],
+    "least_response_time": [
+      {
+        "total_requests": 70,
+        "successful_requests": 70,
+        "failed_requests": 0,
+        "average_response_time_ms": 484.856,
+        "min_response_time_ms": 58.206,
+        "max_response_time_ms": 798.137,
+        "total_duration_seconds": 11.533,
+        "throughput_rps": 6.07,
+        "requests_per_backend": {
+          "backend-2": 8,
+          "backend-3": 45,
+          "backend-1": 17
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_response_time",
+        "generated_at": "2026-03-26T18:21:37Z"
+      },
+      {
+        "total_requests": 70,
+        "successful_requests": 70,
+        "failed_requests": 0,
+        "average_response_time_ms": 455.556,
+        "min_response_time_ms": 86.292,
+        "max_response_time_ms": 802.877,
+        "total_duration_seconds": 10.886,
+        "throughput_rps": 6.43,
+        "requests_per_backend": {
+          "backend-2": 34,
+          "backend-3": 18,
+          "backend-1": 18
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_response_time",
+        "generated_at": "2026-03-26T18:21:48Z"
+      }
+    ]
+  }
+}

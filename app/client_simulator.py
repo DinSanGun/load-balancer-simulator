@@ -57,6 +57,8 @@ def run_simulation(
     target_url: str,
     timeout_seconds: float,
     concurrency: int = 1,
+    progress_every: int = 0,
+    progress_label: str = "simulation",
 ) -> SimulationResult:
     """
     Send many GET requests to the load balancer and collect basic metrics.
@@ -68,9 +70,21 @@ def run_simulation(
 
     successes = 0
     failures = 0
+    completed = 0
     durations_ms: list[float] = []
     backend_counter: Counter[str] = Counter()
     started_run = time.perf_counter()
+
+    def maybe_print_progress() -> None:
+        if progress_every <= 0:
+            return
+        if completed % progress_every != 0 and completed != total_requests:
+            return
+        elapsed = time.perf_counter() - started_run
+        print(
+            f"[{progress_label}] progress {completed}/{total_requests} | "
+            f"success={successes} failed={failures} elapsed={elapsed:.1f}s"
+        )
 
     if concurrency <= 1:
         for _ in range(total_requests):
@@ -82,6 +96,8 @@ def run_simulation(
             else:
                 failures += 1
             backend_counter[backend_name] += 1
+            completed += 1
+            maybe_print_progress()
     else:
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = [executor.submit(_perform_request, target_url, timeout_seconds) for _ in range(total_requests)]
@@ -94,6 +110,8 @@ def run_simulation(
                 else:
                     failures += 1
                 backend_counter[backend_name] += 1
+                completed += 1
+                maybe_print_progress()
 
     avg_ms = sum(durations_ms) / len(durations_ms) if durations_ms else 0.0
     min_ms = min(durations_ms) if durations_ms else 0.0
@@ -186,6 +204,12 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Number of worker threads used by simulator (default: 1)",
     )
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=50,
+        help="Print progress every N completed requests (0 disables, default: 50)",
+    )
     return parser.parse_args()
 
 
@@ -195,12 +219,16 @@ def main() -> None:
         raise ValueError("--requests must be greater than 0")
     if args.concurrency <= 0:
         raise ValueError("--concurrency must be greater than 0")
+    if args.progress_every < 0:
+        raise ValueError("--progress-every must be 0 or greater")
 
     result = run_simulation(
         total_requests=args.requests,
         target_url=args.url,
         timeout_seconds=args.timeout,
         concurrency=args.concurrency,
+        progress_every=args.progress_every,
+        progress_label=args.strategy_label,
     )
     output_path = save_result(result, args.strategy_label)
     print_summary(result, output_path)

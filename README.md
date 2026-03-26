@@ -135,6 +135,12 @@ source .venv/bin/activate
 python -m app.client_simulator --requests 200 --concurrency 1 --url http://127.0.0.1:8000/ --strategy-label round_robin
 ```
 
+To show periodic progress during long runs:
+
+```bash
+python -m app.client_simulator --requests 500 --concurrency 5 --progress-every 100 --strategy-label round_robin
+```
+
 What it collects per run:
 - total requests
 - successful requests
@@ -194,6 +200,12 @@ Example:
 ```bash
 source .venv/bin/activate
 python -m app.benchmark_runner --requests 300 --concurrency 5 --path / --timeout 3.0 --repetitions 2
+```
+
+To show periodic progress for each strategy run:
+
+```bash
+python -m app.benchmark_runner --requests 300 --concurrency 5 --repetitions 2 --progress-every 100
 ```
 
 Benchmark outputs:
