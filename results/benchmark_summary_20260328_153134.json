@@ -1,0 +1,144 @@
+{
+  "generated_at": "2026-03-28T12:31:34Z",
+  "scenario_name": "balanced",
+  "scenario_description": "All backends similar: moderate fixed delay and low jitter; no simulated failures.",
+  "backend_behaviors": {
+    "backend-1": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    },
+    "backend-2": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    },
+    "backend-3": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    }
+  },
+  "benchmark_parameters": {
+    "total_requests_per_run": 15,
+    "concurrency": 1,
+    "path": "/",
+    "timeout_seconds": 3.0,
+    "repetitions_per_strategy": 1,
+    "target_host": "127.0.0.1",
+    "target_port": 8000,
+    "backends_started_by_runner": true
+  },
+  "strategies": [
+    {
+      "strategy": "round_robin",
+      "repetitions": 1,
+      "total_requests": 15,
+      "successful_requests": 15,
+      "failed_requests": 0,
+      "average_response_time_ms": 344.167,
+      "min_response_time_ms": 92.83,
+      "max_response_time_ms": 671.889,
+      "average_throughput_rps": 2.905,
+      "requests_per_backend": {
+        "backend-3": 5,
+        "backend-1": 5,
+        "backend-2": 5
+      }
+    },
+    {
+      "strategy": "least_connections",
+      "repetitions": 1,
+      "total_requests": 15,
+      "successful_requests": 15,
+      "failed_requests": 0,
+      "average_response_time_ms": 347.506,
+      "min_response_time_ms": 189.101,
+      "max_response_time_ms": 775.918,
+      "average_throughput_rps": 2.877,
+      "requests_per_backend": {
+        "backend-2": 5,
+        "backend-3": 5,
+        "backend-1": 5
+      }
+    },
+    {
+      "strategy": "least_response_time",
+      "repetitions": 1,
+      "total_requests": 15,
+      "successful_requests": 14,
+      "failed_requests": 1,
+      "average_response_time_ms": 238.574,
+      "min_response_time_ms": 191.666,
+      "max_response_time_ms": 415.271,
+      "average_throughput_rps": 4.19,
+      "requests_per_backend": {
+        "backend-3": 13,
+        "backend-1": 1,
+        "backend-2": 1
+      }
+    }
+  ],
+  "raw_runs": {
+    "round_robin": [
+      {
+        "total_requests": 15,
+        "successful_requests": 15,
+        "failed_requests": 0,
+        "average_response_time_ms": 344.167,
+        "min_response_time_ms": 92.83,
+        "max_response_time_ms": 671.889,
+        "total_duration_seconds": 5.164,
+        "throughput_rps": 2.905,
+        "requests_per_backend": {
+          "backend-3": 5,
+          "backend-1": 5,
+          "backend-2": 5
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "round_robin",
+        "generated_at": "2026-03-28T12:31:22Z"
+      }
+    ],
+    "least_connections": [
+      {
+        "total_requests": 15,
+        "successful_requests": 15,
+        "failed_requests": 0,
+        "average_response_time_ms": 347.506,
+        "min_response_time_ms": 189.101,
+        "max_response_time_ms": 775.918,
+        "total_duration_seconds": 5.214,
+        "throughput_rps": 2.877,
+        "requests_per_backend": {
+          "backend-2": 5,
+          "backend-3": 5,
+          "backend-1": 5
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_connections",
+        "generated_at": "2026-03-28T12:31:28Z"
+      }
+    ],
+    "least_response_time": [
+      {
+        "total_requests": 15,
+        "successful_requests": 14,
+        "failed_requests": 1,
+        "average_response_time_ms": 238.574,
+        "min_response_time_ms": 191.666,
+        "max_response_time_ms": 415.271,
+        "total_duration_seconds": 3.58,
+        "throughput_rps": 4.19,
+        "requests_per_backend": {
+          "backend-3": 13,
+          "backend-1": 1,
+          "backend-2": 1
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_response_time",
+        "generated_at": "2026-03-28T12:31:34Z"
+      }
+    ]
+  }
+}

@@ -65,5 +65,17 @@ def test_benchmark_runner_creates_summary_files_with_expected_structure(monkeypa
     assert csv_path.exists()
 
     parsed = json.loads(json_path.read_text(encoding="utf-8"))
-    assert set(parsed.keys()) == {"generated_at", "scenario", "strategies", "raw_runs"}
+    assert set(parsed.keys()) == {
+        "generated_at",
+        "scenario_name",
+        "scenario_description",
+        "backend_behaviors",
+        "benchmark_parameters",
+        "strategies",
+        "raw_runs",
+    }
+    assert parsed["scenario_name"] is None
+    assert parsed["scenario_description"] is None
+    assert parsed["backend_behaviors"] is None
+    assert parsed["benchmark_parameters"]["backends_started_by_runner"] is False
     assert len(parsed["strategies"]) == 3

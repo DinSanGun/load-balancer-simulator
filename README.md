@@ -1,66 +1,107 @@
 # Load Balancer Simulator
 
-A Python FastAPI-based cloud load balancer simulator designed to compare different traffic distribution strategies under simulated load.
+A small **local, educational** Python project: a FastAPI reverse-proxy load balancer, synthetic backends, and tools to compare routing strategies under configurable conditions. It is meant for learning and experimentation—not a production load balancer.
+
+## Highlights
+
+- **Modular strategies**: Round Robin, Least Connections, and Least Response Time (`app/strategies.py`), selected via `LB_STRATEGY`.
+- **Backend behavior simulation**: per-backend fixed delay, jitter, and failure rate (environment-driven, `app/config.py` + `app/backend_server.py`).
+- **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`) so runs are repeatable; the benchmark runner can start backends for you (`--scenario`).
+- **Self-describing benchmark JSON**: each run records scenario metadata, workload parameters, and per-strategy results (see [Results](#results) and [Benchmark outputs](#benchmark-all-strategies-same-workload)).
+- **Automated tests**: lightweight **pytest** suite—unit tests for strategies, integration-style tests for the balancer, smoke tests for benchmark output shape (see [Automated testing](#automated-testing)).
 
 ## Overview
 
-This project simulates a cloud-style load balancer that distributes HTTP requests across multiple backend service instances.  
-It focuses on understanding how different load balancing strategies affect performance and resource utilization.
+The project simulates routing HTTP `GET` traffic from a single load balancer entrypoint to three backend instances. You can compare how different algorithms distribute work and how latency, jitter, and failures affect outcomes—on your machine, with no cloud or cluster required.
 
-## MVP (Implemented)
+## Current features
 
-- 3 backend services (FastAPI)
-  - `GET /` returns a message identifying the server
-  - Supports configurable behavior simulation:
-    - fixed delay (ms)
-    - random jitter (ms)
-    - failure rate (0.0 to 1.0)
-  - `GET /health` returns status OK
-- 1 load balancer service (FastAPI)
-  - `GET /` forwards requests to backends using HTTP (`requests`)
-  - Strategy-based routing:
-    - Round Robin
-    - Least Connections
-    - Least Response Time
-  - TCP reachability health checks (Python sockets) to skip unhealthy backends
-  - Logs which backend handled each request
-- 1 client simulator script
-  - Sends configurable number of `GET /` requests to the load balancer
-  - Collects basic performance metrics
-  - Saves simulation output to `results/*.json`
+**Backends (FastAPI, ports 8001–8003 by default)**
 
-## Features (Planned / Later)
+- `GET /` — identifies the server; optional simulated processing via delay, jitter, and random HTTP 500s.
+- `GET /health` — quick OK response (no artificial delay).
+- Behavior configured with env vars (global or per-backend), documented below.
 
-- Multiple backend services (FastAPI)
-- Load balancer with support for:
-  - Round Robin
-  - Least Connections
-  - Least Response Time
-- HTTP request forwarding
-- TCP-based health checks for backend availability
-- Performance metrics:
-  - Response time
-  - Load distribution per instance
-- Results export (JSON)
+**Load balancer (FastAPI, default port 8000)**
+
+- `GET /` — forwards to a chosen backend using HTTP (`requests`); response includes which backend served the request (`X-Backend`).
+- TCP socket reachability checks before routing; unreachable backends are skipped.
+- Strategy pluggable via `LB_STRATEGY`: `round_robin`, `least_connections`, `least_response_time`.
+
+**Client simulator**
+
+- Sends many `GET /` requests to the balancer; optional concurrency and periodic progress output.
+- Collects success/failure counts, latency stats, throughput, and per-backend counts; writes JSON under `results/`.
+
+**Benchmark runner**
+
+- Runs all three strategies under the **same** workload (requests, concurrency, timeout, path).
+- Optional **`--scenario`** — starts and stops all three backends with a named preset from `app/benchmark_scenarios.py`.
+- Writes **JSON + CSV** comparison files under `results/` (see [Results](#results)).
+
+**Automated testing**
+
+- `pytest` suite covering strategies, balancer routing behavior, and benchmark output structure ([Automated testing](#automated-testing)).
+
+## Automated testing
+
+Tests are a first-class part of the project: they keep strategy and routing logic safe to change and document expected behavior for interviews and demos.
+
+The suite uses **pytest** with **no heavy infrastructure** (no Docker, no cloud). It is split into three groups:
+
+| Group | Location | What it covers |
+|-------|----------|----------------|
+| **Unit** | `tests/unit/` | Strategy selection (round robin rotation, least-connections preference, least-response-time averages, tie-breaking); named scenario registry and serialization. |
+| **Integration-style** | `tests/integration/` | FastAPI `TestClient` against the load balancer app with **mocked** HTTP to backends—forwarding, skipping unhealthy backends, propagating backend error responses. Not a full multi-process network test. |
+| **Smoke** | `tests/smoke/` | Benchmark runner **output**: JSON shape and file creation with mocked subprocesses and simulator (fast, deterministic). |
+
+Run everything:
+
+```bash
+source .venv/bin/activate
+pytest
+```
+
+Run by group:
+
+```bash
+pytest tests/unit
+pytest tests/integration
+pytest tests/smoke
+```
+
+## Results
+
+The `results/` directory (created automatically) holds JSON (and optional CSV) from local runs:
+
+| Source | Typical files | Contents |
+|--------|----------------|----------|
+| Client simulator | `simulation_<label>_<timestamp>.json` | Metrics for one manual run against a load balancer you started (label from `--strategy-label`). |
+| Benchmark runner | `benchmark_summary_<timestamp>.json`, `benchmark_comparison_<timestamp>.csv` | Side-by-side strategy comparison for one benchmark session. |
+
+These files are for **local experimentation and later comparison** (e.g. before/after a change, or across scenarios). They are not uploaded or analyzed by the project itself.
 
 ## Technologies
 
-- Python
-- FastAPI
-- HTTP (request routing)
-- TCP (health checks)
+- Python 3.x
+- FastAPI, Uvicorn
+- `requests` (HTTP forwarding and client traffic)
+- TCP sockets (reachability checks)
+- pytest, httpx (tests only)
 
-## Getting Started
+## Getting started
 
-### Project Structure
+### Project structure
 
-- `app/config.py`: backend list + simple settings + backend behavior config
-- `app/backend_server.py`: backend FastAPI service (`GET /` and `GET /health`)
-- `app/load_balancer.py`: load balancer FastAPI service (`GET /` forwards to backends)
-- `app/healthcheck.py`: TCP health check logic (socket connect)
-- `app/strategies.py`: strategy abstraction + all strategy implementations
-- `app/client_simulator.py`: sends requests + collects and saves metrics
-- `app/benchmark_runner.py`: runs all strategies under same scenario and saves comparison files
+- `app/config.py` — backend list, load-balancer strategy env, backend behavior resolution
+- `app/backend_server.py` — backend FastAPI app
+- `app/load_balancer.py` — load balancer FastAPI app
+- `app/healthcheck.py` — TCP health checks
+- `app/strategies.py` — strategy abstraction and implementations
+- `app/client_simulator.py` — load generator and metrics
+- `app/benchmark_runner.py` — multi-strategy benchmark CLI
+- `app/benchmark_scenarios.py` — named scenario definitions
+- `tests/` — pytest tests (`unit`, `integration`, `smoke`)
 
 ### Setup
 
@@ -70,23 +111,6 @@ Create a virtual environment and install dependencies:
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-### Run automated tests
-
-Run all tests:
-
-```bash
-source .venv/bin/activate
-pytest
-```
-
-Run specific groups:
-
-```bash
-pytest tests/unit
-pytest tests/integration
-pytest tests/smoke
 ```
 
 ### Run the 3 backend services
@@ -117,16 +141,19 @@ BACKEND_NAME=backend-3 uvicorn app.backend_server:app --host 127.0.0.1 --port 80
 #### Optional backend behavior configuration
 
 Each backend can simulate:
+
 - fixed delay in milliseconds
 - additional random jitter in milliseconds
 - failure rate between `0.0` and `1.0`
 
 Global env vars (applies to all backends):
+
 - `BACKEND_FIXED_DELAY_MS`
 - `BACKEND_JITTER_MS`
 - `BACKEND_FAILURE_RATE`
 
 Backend-specific env vars (override global values):
+
 - `BACKEND_1_FIXED_DELAY_MS`, `BACKEND_1_JITTER_MS`, `BACKEND_1_FAILURE_RATE`
 - `BACKEND_2_FIXED_DELAY_MS`, `BACKEND_2_JITTER_MS`, `BACKEND_2_FAILURE_RATE`
 - `BACKEND_3_FIXED_DELAY_MS`, `BACKEND_3_JITTER_MS`, `BACKEND_3_FAILURE_RATE`
@@ -197,6 +224,7 @@ python -m app.client_simulator --requests 500 --concurrency 5 --progress-every 1
 ```
 
 What it collects per run:
+
 - total requests
 - successful requests
 - failed requests
@@ -207,6 +235,7 @@ What it collects per run:
 - requests handled per backend server
 
 Output:
+
 - prints a summary in console
 - writes one JSON file to `results/` (for example: `results/simulation_round_robin_YYYYMMDD_HHMMSS.json`)
 
@@ -240,6 +269,7 @@ python -m app.client_simulator --requests 200 --strategy-label least_response_ti
 ### Benchmark all strategies (same workload)
 
 Use the benchmark runner to execute:
+
 - `round_robin`
 - `least_connections`
 - `least_response_time`
@@ -247,10 +277,32 @@ Use the benchmark runner to execute:
 with the same request count, concurrency, path, and timeout.
 
 Important:
-- Keep backend servers running (`8001`, `8002`, `8003`)
+
 - Do not run another load balancer manually on benchmark host/port (`127.0.0.1:8000` by default), because the runner starts/stops it per strategy.
 
-Example:
+**Backends — choose one mode:**
+
+1. **Manual backends (no `--scenario`)**  
+   Start all three backend servers yourself on ports `8001`, `8002`, `8003` (with any env vars you want). The runner does not start them.
+
+2. **Named scenario (`--scenario`)**  
+   The runner starts and stops all three backends with fixed delay, jitter, and failure rate from `app/benchmark_scenarios.py`.  
+   Do not run backends manually in this mode (ports must be free).
+
+List named scenarios:
+
+```bash
+python -m app.benchmark_runner --list-scenarios
+```
+
+Run with a named scenario:
+
+```bash
+source .venv/bin/activate
+python -m app.benchmark_runner --scenario flaky_backend --requests 300 --concurrency 5 --path / --timeout 3.0 --repetitions 2
+```
+
+Run without `--scenario` (you started backends yourself):
 
 ```bash
 source .venv/bin/activate
@@ -260,14 +312,28 @@ python -m app.benchmark_runner --requests 300 --concurrency 5 --path / --timeout
 To show periodic progress for each strategy run:
 
 ```bash
-python -m app.benchmark_runner --requests 300 --concurrency 5 --repetitions 2 --progress-every 100
+python -m app.benchmark_runner --scenario balanced --requests 300 --concurrency 5 --repetitions 2 --progress-every 100
 ```
 
-Benchmark outputs:
-- JSON summary: `results/benchmark_summary_*.json`
-- CSV comparison: `results/benchmark_comparison_*.csv`
+#### Self-describing benchmark results
 
-The benchmark summary includes, per strategy:
+Benchmark JSON is designed to be **self-describing**: a saved file should tell you *what* was run, not only *how it performed*. When you use **`--scenario`**, the summary includes:
+
+- **`scenario_name`** and **`scenario_description`**
+- **`backend_behaviors`** — per-backend `fixed_delay_ms`, `jitter_ms`, `failure_rate` used for that run
+- **`benchmark_parameters`** — workload (requests, concurrency, timeout, path, repetitions, load balancer host/port) and whether the runner started the backends
+
+Without `--scenario`, scenario-related fields are `null` and you rely on your own backend configuration; `benchmark_parameters` still records the workload.
+
+That makes runs **easier to reproduce and interpret later** (comparing files side-by-side, sharing a run with a teammate, or writing down what you tested in an interview).
+
+Files:
+
+- JSON summary: `results/benchmark_summary_*.json`
+- CSV comparison: `results/benchmark_comparison_*.csv` (includes a `scenario_name` column when applicable)
+
+The benchmark summary also includes, **per strategy**:
+
 - total requests
 - successful requests
 - failed requests
@@ -275,20 +341,20 @@ The benchmark summary includes, per strategy:
 - average throughput
 - backend request distribution
 
-### Example benchmark scenarios
+Plus **`raw_runs`** with per-strategy detail.
 
-Scenario A (one clearly fastest backend):
-- backend-1: low delay, no failures
-- backend-2: high delay, no failures
-- backend-3: medium delay, no failures
-- useful for observing `least_response_time`
+### Named benchmark scenarios (built-in)
 
-Scenario B (one unstable backend):
-- backend-1 and backend-2: stable
-- backend-3: non-zero failure rate (for example `0.10`)
-- useful for comparing how strategies behave when one backend intermittently fails
+Defined in `app/benchmark_scenarios.py`:
 
-Now send requests to the load balancer:
+| Name | Idea |
+|------|------|
+| `balanced` | Similar backends; moderate delay and jitter; no failures |
+| `one_slow_backend` | One backend much slower; good for comparing strategies |
+| `flaky_backend` | One backend with occasional simulated HTTP 500 |
+| `high_jitter` | Low fixed delay but high jitter on all backends |
+
+### Try the load balancer manually
 
 ```bash
 curl -i http://127.0.0.1:8000/
@@ -297,9 +363,10 @@ curl -i http://127.0.0.1:8000/
 ```
 
 You should see:
-- Requests rotate between `backend-1`, `backend-2`, `backend-3` (round robin)
-- Response header `X-Backend` telling you which backend was chosen
-- Load balancer logs printing which backend handled each request
+
+- routing according to the active strategy (e.g. rotation for round robin)
+- response header `X-Backend` indicating the chosen backend
+- load balancer logs showing which backend handled each request
 
 ### How the key parts work (in plain terms)
 
@@ -307,16 +374,17 @@ You should see:
 - **TCP health checks**: before choosing a backend, the load balancer tries to open a TCP connection to each backend’s `(host, port)` using `socket.create_connection(...)`. If it can connect, that backend is considered reachable.
 - **Round robin**: the load balancer keeps an internal index pointing to “who’s next”. Every request uses the next backend in the list and then increments the index (wrapping around at the end).
 - **Least connections**: the load balancer tracks active request counts per backend, picks the one with the smallest count, increments before forwarding, and decrements when the request finishes or fails.
-- **Least response time**: the load balancer measures backend response durations and keeps a simple running average per backend, then picks the backend with the lowest average response time.
+- **Least response time**: the load balancer measures backend response durations and keeps a simple running average per backend, then picks the backend with the lowest average response time (with light exploration between measurements).
 
 ## Goals
 
 - Understand load balancing strategies in distributed systems
-- Simulate real-world traffic patterns
-- Build a modular system that can be extended (e.g., HTTPS/TLS support)
+- Simulate traffic patterns in a controlled local environment
+- Keep the codebase modular and easy to extend
 
-## Future Improvements
+## Future improvements
 
-- HTTPS/TLS support
-- Failure simulation (instance crashes)
-- Visualization of results
+- HTTPS/TLS termination at the balancer
+- Richer failure modes (e.g. abrupt process death, partial outages)
+- Charts or notebooks over saved `results/` files
+- Optional packaging or multi-machine demos (out of scope for the current single-host simulator)

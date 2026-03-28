@@ -1,0 +1,144 @@
+{
+  "generated_at": "2026-03-28T12:21:15Z",
+  "scenario_name": "balanced",
+  "scenario_description": "All backends similar: moderate fixed delay and low jitter; no simulated failures.",
+  "backend_behaviors": {
+    "backend-1": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    },
+    "backend-2": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    },
+    "backend-3": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    }
+  },
+  "benchmark_parameters": {
+    "total_requests_per_run": 30,
+    "concurrency": 1,
+    "path": "/",
+    "timeout_seconds": 3.0,
+    "repetitions_per_strategy": 1,
+    "target_host": "127.0.0.1",
+    "target_port": 8000,
+    "backends_started_by_runner": true
+  },
+  "strategies": [
+    {
+      "strategy": "round_robin",
+      "repetitions": 1,
+      "total_requests": 30,
+      "successful_requests": 29,
+      "failed_requests": 1,
+      "average_response_time_ms": 324.576,
+      "min_response_time_ms": 66.74,
+      "max_response_time_ms": 799.953,
+      "average_throughput_rps": 3.08,
+      "requests_per_backend": {
+        "backend-3": 10,
+        "backend-1": 10,
+        "backend-2": 10
+      }
+    },
+    {
+      "strategy": "least_connections",
+      "repetitions": 1,
+      "total_requests": 30,
+      "successful_requests": 29,
+      "failed_requests": 1,
+      "average_response_time_ms": 369.318,
+      "min_response_time_ms": 84.606,
+      "max_response_time_ms": 763.23,
+      "average_throughput_rps": 2.707,
+      "requests_per_backend": {
+        "backend-1": 10,
+        "backend-2": 10,
+        "backend-3": 10
+      }
+    },
+    {
+      "strategy": "least_response_time",
+      "repetitions": 1,
+      "total_requests": 30,
+      "successful_requests": 28,
+      "failed_requests": 2,
+      "average_response_time_ms": 244.813,
+      "min_response_time_ms": 188.641,
+      "max_response_time_ms": 387.923,
+      "average_throughput_rps": 4.083,
+      "requests_per_backend": {
+        "backend-3": 25,
+        "backend-2": 3,
+        "backend-1": 2
+      }
+    }
+  ],
+  "raw_runs": {
+    "round_robin": [
+      {
+        "total_requests": 30,
+        "successful_requests": 29,
+        "failed_requests": 1,
+        "average_response_time_ms": 324.576,
+        "min_response_time_ms": 66.74,
+        "max_response_time_ms": 799.953,
+        "total_duration_seconds": 9.74,
+        "throughput_rps": 3.08,
+        "requests_per_backend": {
+          "backend-3": 10,
+          "backend-1": 10,
+          "backend-2": 10
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "round_robin",
+        "generated_at": "2026-03-28T12:20:54Z"
+      }
+    ],
+    "least_connections": [
+      {
+        "total_requests": 30,
+        "successful_requests": 29,
+        "failed_requests": 1,
+        "average_response_time_ms": 369.318,
+        "min_response_time_ms": 84.606,
+        "max_response_time_ms": 763.23,
+        "total_duration_seconds": 11.082,
+        "throughput_rps": 2.707,
+        "requests_per_backend": {
+          "backend-1": 10,
+          "backend-2": 10,
+          "backend-3": 10
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_connections",
+        "generated_at": "2026-03-28T12:21:07Z"
+      }
+    ],
+    "least_response_time": [
+      {
+        "total_requests": 30,
+        "successful_requests": 28,
+        "failed_requests": 2,
+        "average_response_time_ms": 244.813,
+        "min_response_time_ms": 188.641,
+        "max_response_time_ms": 387.923,
+        "total_duration_seconds": 7.347,
+        "throughput_rps": 4.083,
+        "requests_per_backend": {
+          "backend-3": 25,
+          "backend-2": 3,
+          "backend-1": 2
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_response_time",
+        "generated_at": "2026-03-28T12:21:15Z"
+      }
+    ]
+  }
+}
