@@ -1,0 +1,144 @@
+{
+  "generated_at": "2026-03-29T14:30:29Z",
+  "scenario_name": "flaky_backend",
+  "scenario_description": "One backend has intermittent simulated HTTP 500 responses; others are stable.",
+  "backend_behaviors": {
+    "backend-1": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    },
+    "backend-2": {
+      "fixed_delay_ms": 100,
+      "jitter_ms": 30,
+      "failure_rate": 0.0
+    },
+    "backend-3": {
+      "fixed_delay_ms": 150,
+      "jitter_ms": 50,
+      "failure_rate": 0.12
+    }
+  },
+  "benchmark_parameters": {
+    "total_requests_per_run": 40,
+    "concurrency": 2,
+    "path": "/",
+    "timeout_seconds": 3.0,
+    "repetitions_per_strategy": 1,
+    "target_host": "127.0.0.1",
+    "target_port": 8000,
+    "backends_started_by_runner": true
+  },
+  "strategies": [
+    {
+      "strategy": "round_robin",
+      "repetitions": 1,
+      "total_requests": 40,
+      "successful_requests": 38,
+      "failed_requests": 2,
+      "average_response_time_ms": 394.356,
+      "min_response_time_ms": 150.601,
+      "max_response_time_ms": 747.099,
+      "average_throughput_rps": 5.056,
+      "requests_per_backend": {
+        "backend-3": 13,
+        "backend-2": 14,
+        "backend-1": 13
+      }
+    },
+    {
+      "strategy": "least_connections",
+      "repetitions": 1,
+      "total_requests": 40,
+      "successful_requests": 40,
+      "failed_requests": 0,
+      "average_response_time_ms": 317.46,
+      "min_response_time_ms": 63.562,
+      "max_response_time_ms": 761.103,
+      "average_throughput_rps": 6.076,
+      "requests_per_backend": {
+        "backend-1": 16,
+        "backend-2": 6,
+        "backend-3": 18
+      }
+    },
+    {
+      "strategy": "least_response_time",
+      "repetitions": 1,
+      "total_requests": 40,
+      "successful_requests": 36,
+      "failed_requests": 4,
+      "average_response_time_ms": 256.243,
+      "min_response_time_ms": 188.281,
+      "max_response_time_ms": 455.919,
+      "average_throughput_rps": 7.645,
+      "requests_per_backend": {
+        "backend-2": 5,
+        "backend-3": 32,
+        "backend-1": 3
+      }
+    }
+  ],
+  "raw_runs": {
+    "round_robin": [
+      {
+        "total_requests": 40,
+        "successful_requests": 38,
+        "failed_requests": 2,
+        "average_response_time_ms": 394.356,
+        "min_response_time_ms": 150.601,
+        "max_response_time_ms": 747.099,
+        "total_duration_seconds": 7.912,
+        "throughput_rps": 5.056,
+        "requests_per_backend": {
+          "backend-3": 13,
+          "backend-2": 14,
+          "backend-1": 13
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "round_robin",
+        "generated_at": "2026-03-29T14:30:15Z"
+      }
+    ],
+    "least_connections": [
+      {
+        "total_requests": 40,
+        "successful_requests": 40,
+        "failed_requests": 0,
+        "average_response_time_ms": 317.46,
+        "min_response_time_ms": 63.562,
+        "max_response_time_ms": 761.103,
+        "total_duration_seconds": 6.584,
+        "throughput_rps": 6.076,
+        "requests_per_backend": {
+          "backend-1": 16,
+          "backend-2": 6,
+          "backend-3": 18
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_connections",
+        "generated_at": "2026-03-29T14:30:22Z"
+      }
+    ],
+    "least_response_time": [
+      {
+        "total_requests": 40,
+        "successful_requests": 36,
+        "failed_requests": 4,
+        "average_response_time_ms": 256.243,
+        "min_response_time_ms": 188.281,
+        "max_response_time_ms": 455.919,
+        "total_duration_seconds": 5.232,
+        "throughput_rps": 7.645,
+        "requests_per_backend": {
+          "backend-2": 5,
+          "backend-3": 32,
+          "backend-1": 3
+        },
+        "target_url": "http://127.0.0.1:8000/",
+        "strategy_label": "least_response_time",
+        "generated_at": "2026-03-29T14:30:29Z"
+      }
+    ]
+  }
+}

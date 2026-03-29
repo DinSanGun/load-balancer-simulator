@@ -9,6 +9,7 @@ A small **local, educational** Python project: a FastAPI reverse-proxy load bala
 - **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`) so runs are repeatable; the benchmark runner can start backends for you (`--scenario`).
 - **Self-describing benchmark JSON**: each run records scenario metadata, workload parameters, and per-strategy results (see [Results](#results) and [Benchmark outputs](#benchmark-all-strategies-same-workload)).
 - **Chart export**: optional **matplotlib** CLI turns a `benchmark_summary_*.json` into PNG charts ([Visualizing benchmark results](#visualizing-benchmark-results)).
+- **Demo samples**: committed example benchmark JSON/CSV and charts under [`examples/`](examples/README.md) (no need to run benchmarks to preview output shape).
 - **Automated tests**: lightweight **pytest** suite—unit tests for strategies, integration-style tests for the balancer, smoke tests for benchmark output shape (see [Automated testing](#automated-testing)).
 
 ## Overview
@@ -86,6 +87,8 @@ The `results/` directory (created automatically) holds JSON (and optional CSV) f
 
 These files are for **local experimentation and later comparison** (e.g. before/after a change, or across scenarios). They are not uploaded or analyzed by the project itself.
 
+The repository also includes **sample benchmark outputs and charts** in [`examples/`](examples/README.md) for documentation and portfolio use.
+
 ## Visualizing benchmark results
 
 After a benchmark run, you can turn `results/benchmark_summary_*.json` into static charts for demos or write-ups. The script uses **matplotlib** only (no web UI). Install dependencies first (`matplotlib` is in `requirements.txt`).
@@ -162,6 +165,7 @@ Titles include the **scenario name** (if present in the JSON) and a short subtit
 - `app/benchmark_runner.py` — multi-strategy benchmark CLI
 - `app/benchmark_scenarios.py` — named scenario definitions
 - `app/visualize_results.py` — matplotlib CLI: benchmark JSON → PNG charts
+- `examples/` — committed demo benchmark JSON/CSV + charts ([`examples/README.md`](examples/README.md))
 - `tests/` — pytest tests (`unit`, `integration`, `smoke`)
 
 ### Setup

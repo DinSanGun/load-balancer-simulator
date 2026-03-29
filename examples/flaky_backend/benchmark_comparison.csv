@@ -1,0 +1,4 @@
+scenario_name,strategy,repetitions,total_requests,successful_requests,failed_requests,average_response_time_ms,min_response_time_ms,max_response_time_ms,average_throughput_rps,requests_per_backend
+flaky_backend,round_robin,1,40,38,2,394.356,150.601,747.099,5.056,"{""backend-1"": 13, ""backend-2"": 14, ""backend-3"": 13}"
+flaky_backend,least_connections,1,40,40,0,317.46,63.562,761.103,6.076,"{""backend-1"": 16, ""backend-2"": 6, ""backend-3"": 18}"
+flaky_backend,least_response_time,1,40,36,4,256.243,188.281,455.919,7.645,"{""backend-1"": 3, ""backend-2"": 5, ""backend-3"": 32}"
