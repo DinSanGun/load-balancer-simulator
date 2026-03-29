@@ -8,6 +8,7 @@ A small **local, educational** Python project: a FastAPI reverse-proxy load bala
 - **Backend behavior simulation**: per-backend fixed delay, jitter, and failure rate (environment-driven, `app/config.py` + `app/backend_server.py`).
 - **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`) so runs are repeatable; the benchmark runner can start backends for you (`--scenario`).
 - **Self-describing benchmark JSON**: each run records scenario metadata, workload parameters, and per-strategy results (see [Results](#results) and [Benchmark outputs](#benchmark-all-strategies-same-workload)).
+- **Chart export**: optional **matplotlib** CLI turns a `benchmark_summary_*.json` into PNG charts ([Visualizing benchmark results](#visualizing-benchmark-results)).
 - **Automated tests**: lightweight **pytest** suite—unit tests for strategies, integration-style tests for the balancer, smoke tests for benchmark output shape (see [Automated testing](#automated-testing)).
 
 ## Overview
@@ -38,6 +39,10 @@ The project simulates routing HTTP `GET` traffic from a single load balancer ent
 - Runs all three strategies under the **same** workload (requests, concurrency, timeout, path).
 - Optional **`--scenario`** — starts and stops all three backends with a named preset from `app/benchmark_scenarios.py`.
 - Writes **JSON + CSV** comparison files under `results/` (see [Results](#results)).
+
+**Visualization**
+
+- CLI script reads one benchmark JSON and writes comparison charts (PNG) under `charts/` by default.
 
 **Automated testing**
 
@@ -81,12 +86,67 @@ The `results/` directory (created automatically) holds JSON (and optional CSV) f
 
 These files are for **local experimentation and later comparison** (e.g. before/after a change, or across scenarios). They are not uploaded or analyzed by the project itself.
 
+## Visualizing benchmark results
+
+After a benchmark run, you can turn `results/benchmark_summary_*.json` into static charts for demos or write-ups. The script uses **matplotlib** only (no web UI). Install dependencies first (`matplotlib` is in `requirements.txt`).
+
+### Commands (run from project root, venv active)
+
+**1. Generate a benchmark JSON** (pick one experiment configuration):
+
+```bash
+source .venv/bin/activate
+# Named scenario (runner starts backends; frees ports 8000–8003)
+python -m app.benchmark_runner --scenario balanced --requests 200 --concurrency 3 --repetitions 1
+
+# Another experiment: different scenario or workload
+python -m app.benchmark_runner --scenario flaky_backend --requests 300 --concurrency 5 --timeout 5.0 --repetitions 2
+
+# Or manual backends (you start 8001–8003 yourself), no --scenario
+python -m app.benchmark_runner --requests 200 --concurrency 1
+```
+
+Each run writes a **new** file like `results/benchmark_summary_YYYYMMDD_HHMMSS.json` (and a CSV). The filename encodes the time of the run so experiments do not overwrite each other.
+
+**2. Build charts from that JSON** (use the exact path of the file you care about):
+
+```bash
+python -m app.visualize_results results/benchmark_summary_YYYYMMDD_HHMMSS.json
+```
+
+Optional: choose output folder (default is `charts/`):
+
+```bash
+python -m app.visualize_results results/benchmark_summary_YYYYMMDD_HHMMSS.json -o charts
+```
+
+**3. Latest benchmark file** (shell helper):
+
+```bash
+python -m app.visualize_results "$(ls -t results/benchmark_summary_*.json | head -1)"
+```
+
+**Different experiments = different benchmark runs.** Change `--scenario`, `--requests`, `--concurrency`, `--timeout`, or backend setup (manual mode), run the benchmark again, then point `visualize_results` at the new `benchmark_summary_*.json`. Each visualization produces three PNGs **prefixed with that JSON’s stem**, so results from multiple experiments stay separate in `charts/`.
+
+### Outputs (three PNG files per input JSON)
+
+| File suffix | Chart |
+|-------------|--------|
+| `_response_time.png` | Bar chart: **average response time (ms)** per strategy |
+| `_throughput.png` | Bar chart: **average throughput (req/s)** per strategy |
+| `_backend_distribution.png` | Grouped bar chart: **request counts per backend**, one group per strategy |
+
+Each chart includes a **color legend below the plot** (outside the axes) so labels never cover the bars: strategy name on the first two charts, backend name on the distribution chart.
+
+Titles include the **scenario name** (if present in the JSON) and a short subtitle with request count, concurrency, and `generated_at` when available. Generated PNGs are gitignored under `charts/` by default.
+
 ## Technologies
 
 - Python 3.x
 - FastAPI, Uvicorn
 - `requests` (HTTP forwarding and client traffic)
 - TCP sockets (reachability checks)
+- matplotlib (optional: benchmark chart export)
 - pytest, httpx (tests only)
 
 ## Getting started
@@ -101,6 +161,7 @@ These files are for **local experimentation and later comparison** (e.g. before/
 - `app/client_simulator.py` — load generator and metrics
 - `app/benchmark_runner.py` — multi-strategy benchmark CLI
 - `app/benchmark_scenarios.py` — named scenario definitions
+- `app/visualize_results.py` — matplotlib CLI: benchmark JSON → PNG charts
 - `tests/` — pytest tests (`unit`, `integration`, `smoke`)
 
 ### Setup
@@ -386,5 +447,5 @@ You should see:
 
 - HTTPS/TLS termination at the balancer
 - Richer failure modes (e.g. abrupt process death, partial outages)
-- Charts or notebooks over saved `results/` files
+- Interactive dashboards or richer notebooks over saved `results/` files (static PNG export exists; see [Visualizing benchmark results](#visualizing-benchmark-results))
 - Optional packaging or multi-machine demos (out of scope for the current single-host simulator)
