@@ -2,6 +2,8 @@
 
 This folder contains **checked-in sample outputs** from the benchmark runner so you can inspect **JSON**, **CSV**, and **PNG charts** without running anything locally.
 
+**[`charts/`](charts/)** holds a small set of **renamed PNGs** used in the main README’s [Demo / Example Results](../README.md#demo--example-results) section (same charts as in the scenario subfolders, copied under clearer filenames).
+
 Each subdirectory is one **named scenario** (see `app/benchmark_scenarios.py`). All runs used the same workload for fair comparison:
 
 - **40** requests per strategy run  

@@ -9,8 +9,26 @@ A small **local, educational** Python project: a FastAPI reverse-proxy load bala
 - **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`) so runs are repeatable; the benchmark runner can start backends for you (`--scenario`).
 - **Self-describing benchmark JSON**: each run records scenario metadata, workload parameters, and per-strategy results (see [Results](#results) and [Benchmark outputs](#benchmark-all-strategies-same-workload)).
 - **Chart export**: optional **matplotlib** CLI turns a `benchmark_summary_*.json` into PNG charts ([Visualizing benchmark results](#visualizing-benchmark-results)).
-- **Demo samples**: committed example benchmark JSON/CSV and charts under [`examples/`](examples/README.md) (no need to run benchmarks to preview output shape).
+- **Demo samples**: committed example benchmark JSON/CSV and charts under [`examples/`](examples/README.md); [screenshots](#demo--example-results) in `examples/charts/` for the README.
 - **Automated tests**: lightweight **pytest** suite—unit tests for strategies, integration-style tests for the balancer, smoke tests for benchmark output shape (see [Automated testing](#automated-testing)).
+
+## Demo / Example Results
+
+Static charts below come from [`app/visualize_results.py`](app/visualize_results.py) using committed benchmark JSON under [`examples/`](examples/README.md). Workload for these samples: **40** requests per strategy, **2** concurrent workers, **1** repetition per strategy.
+
+**Balanced scenario** — average response time (ms) per strategy. Similar backend tuning yields comparable latency; strategies still differ slightly in measured averages.
+
+![Balanced scenario: average response time by strategy](examples/charts/balanced_response_time.png)
+
+**One slow backend** — average throughput (req/s) per strategy. One deliberately slow backend shifts how much useful work each strategy completes per second.
+
+![One slow backend: average throughput by strategy](examples/charts/slow_backend_throughput.png)
+
+**Flaky backend** — request counts per backend and strategy. One backend simulates intermittent HTTP 500s; distribution shows how routing responds under partial failure.
+
+![Flaky backend: request distribution per backend by strategy](examples/charts/flaky_backend_distribution.png)
+
+See [`examples/README.md`](examples/README.md) for full JSON, CSV, and per-scenario chart sets.
 
 ## Overview
 

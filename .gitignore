@@ -2,6 +2,7 @@ __pycache__/
 .venv/
 .env
 *.pyc
-charts/
+# Local chart output from visualize_results (root only; examples/charts/ is committed)
+/charts/
 results/
 .mplconfig/
