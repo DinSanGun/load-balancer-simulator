@@ -6,11 +6,10 @@ A small **local, educational** Python project: a FastAPI reverse-proxy load bala
 
 - **Modular strategies**: Round Robin, Least Connections, and Least Response Time (`app/strategies.py`), selected via `LB_STRATEGY`.
 - **Backend behavior simulation**: per-backend fixed delay, jitter, and failure rate (environment-driven, `app/config.py` + `app/backend_server.py`).
-- **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`) so runs are repeatable; the benchmark runner can start backends for you (`--scenario`).
-- **Self-describing benchmark JSON**: each run records scenario metadata, workload parameters, and per-strategy results (see [Results](#results) and [Benchmark outputs](#benchmark-all-strategies-same-workload)).
-- **Chart export**: optional **matplotlib** CLI turns a `benchmark_summary_*.json` into PNG charts ([Visualizing benchmark results](#visualizing-benchmark-results)).
-- **Demo samples**: committed example benchmark JSON/CSV and charts under [`examples/`](examples/README.md); [screenshots](#demo--example-results) in `examples/charts/` for the README.
-- **Automated tests**: lightweight **pytest** suite—unit tests for strategies, integration-style tests for the balancer, smoke tests for benchmark output shape (see [Automated testing](#automated-testing)).
+- **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`); the benchmark runner can start backends for you (`--scenario`).
+- **Self-describing benchmark JSON**: scenario metadata, workload parameters, and per-strategy metrics ([Results](#results); structure in [Benchmark outputs](#benchmark-all-strategies-same-workload)).
+- **Chart export**: matplotlib CLI turns `benchmark_summary_*.json` into PNG charts ([Visualizing benchmark results](#visualizing-benchmark-results); committed samples under [`examples/`](examples/README.md)).
+- **Automated tests**: pytest—unit (strategies), integration-style (balancer), smoke (benchmark output shape) ([Automated testing](#automated-testing)).
 
 ## Demo / Example Results
 
@@ -29,6 +28,32 @@ Static charts below come from [`app/visualize_results.py`](app/visualize_results
 ![Flaky backend: request distribution per backend by strategy](examples/charts/flaky_backend_distribution.png)
 
 See [`examples/README.md`](examples/README.md) for full JSON, CSV, and per-scenario chart sets.
+
+## Quick Start
+
+From the project root (Python 3.x):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Run one **named scenario** (benchmark runner starts backends and the load balancer; keep ports **8000–8003** free):
+
+```bash
+python -m app.benchmark_runner --scenario balanced --requests 200 --concurrency 3 --repetitions 1
+```
+
+Build **charts** from the latest benchmark JSON (writes PNGs under `charts/` by default):
+
+```bash
+python -m app.visualize_results "$(ls -t results/benchmark_summary_*.json | head -1)"
+```
+
+To explore without a local run, use committed outputs in [`examples/`](examples/README.md). For manual backends, step-by-step processes, and full CLI options, see [Setup](#setup) and the sections below.
+
+---
 
 ## Overview
 
@@ -62,10 +87,6 @@ The project simulates routing HTTP `GET` traffic from a single load balancer ent
 **Visualization**
 
 - CLI script reads one benchmark JSON and writes comparison charts (PNG) under `charts/` by default.
-
-**Automated testing**
-
-- `pytest` suite covering strategies, balancer routing behavior, and benchmark output structure ([Automated testing](#automated-testing)).
 
 ## Automated testing
 
@@ -107,11 +128,23 @@ These files are for **local experimentation and later comparison** (e.g. before/
 
 The repository also includes **sample benchmark outputs and charts** in [`examples/`](examples/README.md) for documentation and portfolio use.
 
+## Technologies
+
+- Python 3.x
+- FastAPI, Uvicorn
+- `requests` (HTTP forwarding and client traffic)
+- TCP sockets (reachability checks)
+- matplotlib (optional: benchmark chart export)
+- pytest, httpx (tests only)
+
 ## Visualizing benchmark results
 
-After a benchmark run, you can turn `results/benchmark_summary_*.json` into static charts for demos or write-ups. The script uses **matplotlib** only (no web UI). Install dependencies first (`matplotlib` is in `requirements.txt`).
+After a benchmark run, turn `results/benchmark_summary_*.json` into static charts using **matplotlib** (included in `requirements.txt`). No web UI.
 
-### Commands (run from project root, venv active)
+**Minimal flow** (same as [Quick Start](#quick-start)): point `app.visualize_results` at a summary JSON; optional `-o` sets the output directory (default `charts/`).
+
+<details>
+<summary><strong>More commands and options</strong> (alternate scenarios, manual backends, latest file helper)</summary>
 
 **1. Generate a benchmark JSON** (pick one experiment configuration):
 
@@ -149,6 +182,8 @@ python -m app.visualize_results "$(ls -t results/benchmark_summary_*.json | head
 
 **Different experiments = different benchmark runs.** Change `--scenario`, `--requests`, `--concurrency`, `--timeout`, or backend setup (manual mode), run the benchmark again, then point `visualize_results` at the new `benchmark_summary_*.json`. Each visualization produces three PNGs **prefixed with that JSON’s stem**, so results from multiple experiments stay separate in `charts/`.
 
+</details>
+
 ### Outputs (three PNG files per input JSON)
 
 | File suffix | Chart |
@@ -159,20 +194,9 @@ python -m app.visualize_results "$(ls -t results/benchmark_summary_*.json | head
 
 Each chart includes a **color legend below the plot** (outside the axes) so labels never cover the bars: strategy name on the first two charts, backend name on the distribution chart.
 
-Titles include the **scenario name** (if present in the JSON) and a short subtitle with request count, concurrency, and `generated_at` when available. Generated PNGs are gitignored under `charts/` by default.
+Titles include the **scenario name** (if present in the JSON) and a short subtitle with request count, concurrency, and `generated_at` when available. Generated PNGs under the repo-root `charts/` directory are gitignored (see `.gitignore`); committed demo charts live under [`examples/`](examples/README.md).
 
-## Technologies
-
-- Python 3.x
-- FastAPI, Uvicorn
-- `requests` (HTTP forwarding and client traffic)
-- TCP sockets (reachability checks)
-- matplotlib (optional: benchmark chart export)
-- pytest, httpx (tests only)
-
-## Getting started
-
-### Project structure
+## Project structure
 
 - `app/config.py` — backend list, load-balancer strategy env, backend behavior resolution
 - `app/backend_server.py` — backend FastAPI app
@@ -186,7 +210,7 @@ Titles include the **scenario name** (if present in the JSON) and a short subtit
 - `examples/` — committed demo benchmark JSON/CSV + charts ([`examples/README.md`](examples/README.md))
 - `tests/` — pytest tests (`unit`, `integration`, `smoke`)
 
-### Setup
+## Setup
 
 Create a virtual environment and install dependencies:
 
@@ -196,7 +220,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Run the 3 backend services
+## Run the 3 backend services
 
 Open 3 terminals (or run in the background). Each backend runs the same code, but on a different port + name.
 
@@ -221,7 +245,8 @@ source .venv/bin/activate
 BACKEND_NAME=backend-3 uvicorn app.backend_server:app --host 127.0.0.1 --port 8003
 ```
 
-#### Optional backend behavior configuration
+<details>
+<summary><strong>Optional backend behavior configuration</strong> (delay, jitter, failure rate via env vars)</summary>
 
 Each backend can simulate:
 
@@ -265,7 +290,9 @@ curl http://127.0.0.1:8001/
 curl http://127.0.0.1:8002/health
 ```
 
-### Run the load balancer
+</details>
+
+## Run the load balancer
 
 In a 4th terminal:
 
@@ -291,7 +318,7 @@ source .venv/bin/activate
 LB_STRATEGY=least_response_time uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
 ```
 
-### Run the client simulator
+## Run the client simulator
 
 Run the simulator from the project root (with backend services + load balancer running):
 
@@ -322,7 +349,7 @@ Output:
 - prints a summary in console
 - writes one JSON file to `results/` (for example: `results/simulation_round_robin_YYYYMMDD_HHMMSS.json`)
 
-### Compare strategies (run one at a time)
+## Compare strategies (run one at a time)
 
 1. Start backend services (`8001`, `8002`, `8003`)
 2. Start load balancer with one strategy (example below)
@@ -349,7 +376,7 @@ LB_STRATEGY=least_response_time uvicorn app.load_balancer:app --host 127.0.0.1 -
 python -m app.client_simulator --requests 200 --strategy-label least_response_time
 ```
 
-### Benchmark all strategies (same workload)
+## Benchmark all strategies (same workload)
 
 Use the benchmark runner to execute:
 
@@ -398,7 +425,8 @@ To show periodic progress for each strategy run:
 python -m app.benchmark_runner --scenario balanced --requests 300 --concurrency 5 --repetitions 2 --progress-every 100
 ```
 
-#### Self-describing benchmark results
+<details>
+<summary><strong>Self-describing benchmark results</strong> (fields in the JSON summary)</summary>
 
 Benchmark JSON is designed to be **self-describing**: a saved file should tell you *what* was run, not only *how it performed*. When you use **`--scenario`**, the summary includes:
 
@@ -426,6 +454,8 @@ The benchmark summary also includes, **per strategy**:
 
 Plus **`raw_runs`** with per-strategy detail.
 
+</details>
+
 ### Named benchmark scenarios (built-in)
 
 Defined in `app/benchmark_scenarios.py`:
@@ -437,7 +467,7 @@ Defined in `app/benchmark_scenarios.py`:
 | `flaky_backend` | One backend with occasional simulated HTTP 500 |
 | `high_jitter` | Low fixed delay but high jitter on all backends |
 
-### Try the load balancer manually
+## Try the load balancer manually
 
 ```bash
 curl -i http://127.0.0.1:8000/
@@ -451,13 +481,16 @@ You should see:
 - response header `X-Backend` indicating the chosen backend
 - load balancer logs showing which backend handled each request
 
-### How the key parts work (in plain terms)
+<details>
+<summary><strong>How the key parts work</strong> (plain-language behavior)</summary>
 
 - **HTTP forwarding**: the load balancer receives your `GET /`, then makes its own `GET /` HTTP request to a chosen backend using `requests.get(...)`, and returns the backend’s JSON response back to you.
 - **TCP health checks**: before choosing a backend, the load balancer tries to open a TCP connection to each backend’s `(host, port)` using `socket.create_connection(...)`. If it can connect, that backend is considered reachable.
 - **Round robin**: the load balancer keeps an internal index pointing to “who’s next”. Every request uses the next backend in the list and then increments the index (wrapping around at the end).
 - **Least connections**: the load balancer tracks active request counts per backend, picks the one with the smallest count, increments before forwarding, and decrements when the request finishes or fails.
 - **Least response time**: the load balancer measures backend response durations and keeps a simple running average per backend, then picks the backend with the lowest average response time (with light exploration between measurements).
+
+</details>
 
 ## Goals
 
