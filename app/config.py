@@ -129,3 +129,8 @@ BACKEND_MAX_DELAY_SECONDS = 0.8
 # - "least_connections"
 # - "least_response_time"
 LOAD_BALANCING_STRATEGY = os.getenv("LB_STRATEGY", "round_robin").strip().lower()
+
+# Simple overload guard:
+# maximum number of in-flight requests the load balancer accepts at once.
+# New requests above this limit are rejected with HTTP 503.
+LOAD_BALANCER_MAX_IN_FLIGHT = max(1, _get_env_int("LB_MAX_IN_FLIGHT", 100))

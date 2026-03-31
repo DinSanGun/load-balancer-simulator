@@ -5,6 +5,7 @@ A small **local, educational** Python project: a FastAPI reverse-proxy load bala
 ## Highlights
 
 - **Modular strategies**: Round Robin, Least Connections, and Least Response Time (`app/strategies.py`), selected via `LB_STRATEGY`.
+- **Overload protection (fail-fast)**: configurable max in-flight requests at the balancer; excess requests are rejected with HTTP 503 (`LB_MAX_IN_FLIGHT`).
 - **Backend behavior simulation**: per-backend fixed delay, jitter, and failure rate (environment-driven, `app/config.py` + `app/backend_server.py`).
 - **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`); the benchmark runner can start backends for you (`--scenario`).
 - **Self-describing benchmark JSON**: scenario metadata, workload parameters, and per-strategy metrics ([Results](#results); structure in [Benchmark outputs](#benchmark-all-strategies-same-workload)).
@@ -72,6 +73,8 @@ The project simulates routing HTTP `GET` traffic from a single load balancer ent
 - `GET /` — forwards to a chosen backend using HTTP (`requests`); response includes which backend served the request (`X-Backend`).
 - TCP socket reachability checks before routing; unreachable backends are skipped.
 - Strategy pluggable via `LB_STRATEGY`: `round_robin`, `least_connections`, `least_response_time`.
+- Overload guard via `LB_MAX_IN_FLIGHT` (default `100`): when active in-flight requests hit the limit, new requests fail fast with HTTP `503`.
+- `GET /lb/status` — minimal local status/metrics (`active_requests`, `rejected_requests_total`, `peak_active_requests`, `max_in_flight_requests`).
 
 **Client simulator**
 
@@ -316,6 +319,13 @@ LB_STRATEGY=least_connections uvicorn app.load_balancer:app --host 127.0.0.1 --p
 ```bash
 source .venv/bin/activate
 LB_STRATEGY=least_response_time uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
+```
+
+Optional overload limit (fail-fast `503` when exceeded):
+
+```bash
+source .venv/bin/activate
+LB_MAX_IN_FLIGHT=50 uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
 ```
 
 ## Run the client simulator
