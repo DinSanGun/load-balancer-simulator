@@ -7,7 +7,13 @@ import requests
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from .config import BACKENDS, Backend, LOAD_BALANCING_STRATEGY, LOAD_BALANCER_MAX_IN_FLIGHT
+from .config import (
+    BACKENDS,
+    Backend,
+    LOAD_BALANCING_STRATEGY,
+    LOAD_BALANCER_MAX_IN_FLIGHT,
+    LOAD_BALANCER_OVERLOAD_ERROR_TEXT,
+)
 from .healthcheck import filter_healthy_backends
 from .strategies import LoadBalancingStrategy, build_strategy
 
@@ -103,7 +109,7 @@ def root() -> JSONResponse:
     if not overload_state.try_acquire():
         return JSONResponse(
             status_code=503,
-            content={"error": "Load balancer overloaded. Try again shortly."},
+            content={"error": LOAD_BALANCER_OVERLOAD_ERROR_TEXT},
         )
 
     backend: Backend | None = None

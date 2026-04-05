@@ -8,6 +8,7 @@ A small **local, educational** Python project: a FastAPI reverse-proxy load bala
 - **Overload protection (fail-fast)**: configurable max in-flight requests at the balancer; excess requests are rejected with HTTP 503 (`LB_MAX_IN_FLIGHT`).
 - **Backend behavior simulation**: per-backend fixed delay, jitter, and failure rate (environment-driven, `app/config.py` + `app/backend_server.py`).
 - **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`); the benchmark runner can start backends for you (`--scenario`).
+- **Benchmark overload capture**: per-strategy counts for HTTP `503` overload rejections vs other failures, plus success-only throughput (`overload_rejected_requests`, `successful_throughput_rps`); optional `--lb-max-in-flight` on the runner to saturate the balancer locally.
 - **Self-describing benchmark JSON**: scenario metadata, workload parameters, and per-strategy metrics ([Results](#results); structure in [Benchmark outputs](#benchmark-all-strategies-same-workload)).
 - **Chart export**: matplotlib CLI turns `benchmark_summary_*.json` into PNG charts ([Visualizing benchmark results](#visualizing-benchmark-results); committed samples under [`examples/`](examples/README.md)).
 - **Automated tests**: pytest—unit (strategies), integration-style (balancer), smoke (benchmark output shape) ([Automated testing](#automated-testing)).
@@ -79,13 +80,14 @@ The project simulates routing HTTP `GET` traffic from a single load balancer ent
 **Client simulator**
 
 - Sends many `GET /` requests to the balancer; optional concurrency and periodic progress output.
-- Collects success/failure counts, latency stats, throughput, and per-backend counts; writes JSON under `results/`.
+- Collects success counts, **non-overload** failure counts, **overload `503`** counts (distinct from other errors), latency stats, offered-load and success-only throughput, and per-backend (or overload-bucket) counts; writes JSON under `results/`.
 
 **Benchmark runner**
 
 - Runs all three strategies under the **same** workload (requests, concurrency, timeout, path).
 - Optional **`--scenario`** — starts and stops all three backends with a named preset from `app/benchmark_scenarios.py`.
-- Writes **JSON + CSV** comparison files under `results/` (see [Results](#results)).
+- Optional **`--lb-max-in-flight`** — when set, each per-strategy load balancer child process uses that `LB_MAX_IN_FLIGHT` (combine with high `--concurrency` and scenario `overload_saturation` to record many `503` overload responses).
+- Writes **JSON + CSV** comparison files under `results/` (see [Results](#results)); strategy rows include `overload_rejected_requests` and `successful_throughput_rps`, and `benchmark_parameters` may include `load_balancer_max_in_flight`.
 
 **Visualization**
 
@@ -435,6 +437,13 @@ To show periodic progress for each strategy run:
 python -m app.benchmark_runner --scenario balanced --requests 300 --concurrency 5 --repetitions 2 --progress-every 100
 ```
 
+Example likely to **trigger overload** on a single machine (many concurrent client threads vs a low in-flight cap; results show `overload_rejected_requests` in JSON/CSV):
+
+```bash
+source .venv/bin/activate
+python -m app.benchmark_runner --scenario overload_saturation --lb-max-in-flight 10 --requests 800 --concurrency 40 --repetitions 1
+```
+
 <details>
 <summary><strong>Self-describing benchmark results</strong> (fields in the JSON summary)</summary>
 
@@ -442,7 +451,7 @@ Benchmark JSON is designed to be **self-describing**: a saved file should tell y
 
 - **`scenario_name`** and **`scenario_description`**
 - **`backend_behaviors`** — per-backend `fixed_delay_ms`, `jitter_ms`, `failure_rate` used for that run
-- **`benchmark_parameters`** — workload (requests, concurrency, timeout, path, repetitions, load balancer host/port) and whether the runner started the backends
+- **`benchmark_parameters`** — workload (requests, concurrency, timeout, path, repetitions, load balancer host/port), whether the runner started the backends, and optional **`load_balancer_max_in_flight`** when you pass **`--lb-max-in-flight`**
 
 Without `--scenario`, scenario-related fields are `null` and you rely on your own backend configuration; `benchmark_parameters` still records the workload.
 
@@ -457,10 +466,12 @@ The benchmark summary also includes, **per strategy**:
 
 - total requests
 - successful requests
-- failed requests
+- failed requests (non-overload failures: timeouts, `502`, `503` “no healthy backends”, etc.)
+- **`overload_rejected_requests`** — HTTP `503` responses from the load balancer overload guard (fail-fast backpressure)
 - average/min/max response time
-- average throughput
-- backend request distribution
+- **`average_throughput_rps`** — offered load: `total_requests / wall_time` for the run
+- **`successful_throughput_rps`** — `successful_requests / wall_time` (useful when many requests are rejected under saturation)
+- backend request distribution (overload responses are counted under the synthetic label `__overload_503__` when present)
 
 Plus **`raw_runs`** with per-strategy detail.
 
@@ -476,6 +487,7 @@ Defined in `app/benchmark_scenarios.py`:
 | `one_slow_backend` | One backend much slower; good for comparing strategies |
 | `flaky_backend` | One backend with occasional simulated HTTP 500 |
 | `high_jitter` | Low fixed delay but high jitter on all backends |
+| `overload_saturation` | Fast backends; use with `--lb-max-in-flight` and concurrency above that cap to exercise overload `503`s |
 
 ## Try the load balancer manually
 

@@ -12,6 +12,7 @@ def test_list_scenario_names_is_sorted_and_nonempty() -> None:
     assert "one_slow_backend" in names
     assert "flaky_backend" in names
     assert "high_jitter" in names
+    assert "overload_saturation" in names
 
 
 def test_get_scenario_unknown_raises() -> None:
@@ -25,3 +26,9 @@ def test_scenario_backend_behaviors_serializable() -> None:
     assert set(d.keys()) == {"backend-1", "backend-2", "backend-3"}
     assert d["backend-1"]["fixed_delay_ms"] == 100
     assert d["backend-1"]["failure_rate"] == 0.0
+
+
+def test_overload_saturation_scenario_is_fast_backends() -> None:
+    sc = get_scenario("overload_saturation")
+    assert sc.name == "overload_saturation"
+    assert all(b.fixed_delay_ms <= 10 for b in sc.backends.values())

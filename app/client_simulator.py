@@ -11,45 +11,65 @@ import time
 
 import requests
 
+from .config import LB_OVERLOAD_REQUEST_LABEL, LOAD_BALANCER_OVERLOAD_ERROR_TEXT
+
 
 @dataclass
 class SimulationResult:
     total_requests: int
     successful_requests: int
-    failed_requests: int
+    failed_requests: int  # Non-overload failures (timeouts, 502, 503 no backends, etc.)
+    overload_rejected_requests: int  # HTTP 503 fail-fast from LB overload guard
     average_response_time_ms: float
     min_response_time_ms: float
     max_response_time_ms: float
     total_duration_seconds: float
     throughput_rps: float
+    successful_throughput_rps: float
     requests_per_backend: dict[str, int]
     target_url: str
     strategy_label: str
     generated_at: str
 
 
-def _perform_request(target_url: str, timeout_seconds: float) -> tuple[bool, float, str]:
+def _perform_request(target_url: str, timeout_seconds: float) -> tuple[str, float, str]:
     """
     Execute one request and return:
-    (is_success, duration_ms, backend_name)
+    (outcome, duration_ms, counter_label).
+
+    outcome:
+    - "success" — HTTP 2xx
+    - "overload" — HTTP 503 with load balancer overload JSON (fail-fast backpressure)
+    - "failure" — any other non-success (timeouts, 502, 503 no backends, etc.)
     """
 
     started = time.perf_counter()
     try:
         response = requests.get(target_url, timeout=timeout_seconds)
         elapsed_ms = (time.perf_counter() - started) * 1000.0
-        success = 200 <= response.status_code < 300
 
-        backend_name = response.headers.get("X-Backend")
-        if not backend_name:
+        if 200 <= response.status_code < 300:
+            backend_name = response.headers.get("X-Backend")
+            if not backend_name:
+                try:
+                    data = response.json()
+                    backend_name = str(data.get("backend", "unknown"))
+                except ValueError:
+                    backend_name = "unknown"
+            return "success", elapsed_ms, backend_name
+
+        if response.status_code == 503:
             try:
                 data = response.json()
-                backend_name = str(data.get("backend", "unknown"))
+                err = data.get("error")
+                if err == LOAD_BALANCER_OVERLOAD_ERROR_TEXT:
+                    return "overload", elapsed_ms, LB_OVERLOAD_REQUEST_LABEL
             except ValueError:
-                backend_name = "unknown"
-        return success, elapsed_ms, backend_name
+                pass
+
+        return "failure", elapsed_ms, "http_error"
     except requests.RequestException:
-        return False, 0.0, "request_error"
+        return "failure", 0.0, "request_error"
 
 
 def run_simulation(
@@ -70,6 +90,7 @@ def run_simulation(
 
     successes = 0
     failures = 0
+    overloads = 0
     completed = 0
     durations_ms: list[float] = []
     backend_counter: Counter[str] = Counter()
@@ -83,16 +104,18 @@ def run_simulation(
         elapsed = time.perf_counter() - started_run
         print(
             f"[{progress_label}] progress {completed}/{total_requests} | "
-            f"success={successes} failed={failures} elapsed={elapsed:.1f}s"
+            f"success={successes} overload={overloads} failed={failures} elapsed={elapsed:.1f}s"
         )
 
     if concurrency <= 1:
         for _ in range(total_requests):
-            success, duration_ms, backend_name = _perform_request(target_url, timeout_seconds)
+            outcome, duration_ms, backend_name = _perform_request(target_url, timeout_seconds)
             if duration_ms > 0:
                 durations_ms.append(duration_ms)
-            if success:
+            if outcome == "success":
                 successes += 1
+            elif outcome == "overload":
+                overloads += 1
             else:
                 failures += 1
             backend_counter[backend_name] += 1
@@ -102,11 +125,13 @@ def run_simulation(
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = [executor.submit(_perform_request, target_url, timeout_seconds) for _ in range(total_requests)]
             for future in as_completed(futures):
-                success, duration_ms, backend_name = future.result()
+                outcome, duration_ms, backend_name = future.result()
                 if duration_ms > 0:
                     durations_ms.append(duration_ms)
-                if success:
+                if outcome == "success":
                     successes += 1
+                elif outcome == "overload":
+                    overloads += 1
                 else:
                     failures += 1
                 backend_counter[backend_name] += 1
@@ -118,16 +143,21 @@ def run_simulation(
     max_ms = max(durations_ms) if durations_ms else 0.0
     total_duration_seconds = time.perf_counter() - started_run
     throughput_rps = (total_requests / total_duration_seconds) if total_duration_seconds > 0 else 0.0
+    successful_throughput_rps = (
+        (successes / total_duration_seconds) if total_duration_seconds > 0 else 0.0
+    )
 
     return SimulationResult(
         total_requests=total_requests,
         successful_requests=successes,
         failed_requests=failures,
+        overload_rejected_requests=overloads,
         average_response_time_ms=round(avg_ms, 3),
         min_response_time_ms=round(min_ms, 3),
         max_response_time_ms=round(max_ms, 3),
         total_duration_seconds=round(total_duration_seconds, 3),
         throughput_rps=round(throughput_rps, 3),
+        successful_throughput_rps=round(successful_throughput_rps, 3),
         requests_per_backend=dict(backend_counter),
         target_url=target_url,
         strategy_label="unknown",
@@ -157,12 +187,14 @@ def print_summary(result: SimulationResult, output_path: Path) -> None:
     print(f"Strategy label:        {result.strategy_label}")
     print(f"Total requests:        {result.total_requests}")
     print(f"Successful requests:   {result.successful_requests}")
+    print(f"Overload 503 (LB):     {result.overload_rejected_requests}")
     print(f"Failed requests:       {result.failed_requests}")
     print(f"Average response (ms): {result.average_response_time_ms}")
     print(f"Min response (ms):     {result.min_response_time_ms}")
     print(f"Max response (ms):     {result.max_response_time_ms}")
     print(f"Total duration (s):    {result.total_duration_seconds}")
     print(f"Throughput (req/s):    {result.throughput_rps}")
+    print(f"Success throughput:    {result.successful_throughput_rps} req/s")
     print("Requests per backend:")
     if result.requests_per_backend:
         for backend_name, count in sorted(result.requests_per_backend.items()):

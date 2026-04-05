@@ -18,7 +18,11 @@ class _FakeProcess:
 
 
 def test_benchmark_runner_creates_summary_files_with_expected_structure(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(br, "_start_load_balancer", lambda strategy, host, port: _FakeProcess())
+    monkeypatch.setattr(
+        br,
+        "_start_load_balancer",
+        lambda strategy, host, port, lb_max_in_flight=None: _FakeProcess(),
+    )
     monkeypatch.setattr(br, "_wait_for_lb", lambda url, timeout_seconds=10.0: None)
     monkeypatch.setattr(br, "_stop_process", lambda proc: None)
 
@@ -35,11 +39,13 @@ def test_benchmark_runner_creates_summary_files_with_expected_structure(monkeypa
             total_requests=total_requests,
             successful_requests=total_requests,
             failed_requests=0,
+            overload_rejected_requests=0,
             average_response_time_ms=100.0,
             min_response_time_ms=90.0,
             max_response_time_ms=120.0,
             total_duration_seconds=1.0,
             throughput_rps=float(total_requests),
+            successful_throughput_rps=float(total_requests),
             requests_per_backend={"backend-1": total_requests},
             target_url=target_url,
             strategy_label=strategy,
@@ -78,4 +84,8 @@ def test_benchmark_runner_creates_summary_files_with_expected_structure(monkeypa
     assert parsed["scenario_description"] is None
     assert parsed["backend_behaviors"] is None
     assert parsed["benchmark_parameters"]["backends_started_by_runner"] is False
+    assert parsed["benchmark_parameters"].get("load_balancer_max_in_flight") is None
     assert len(parsed["strategies"]) == 3
+    for row in parsed["strategies"]:
+        assert row["overload_rejected_requests"] == 0
+        assert row["successful_throughput_rps"] == 5.0

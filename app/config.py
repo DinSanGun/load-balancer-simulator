@@ -134,3 +134,9 @@ LOAD_BALANCING_STRATEGY = os.getenv("LB_STRATEGY", "round_robin").strip().lower(
 # maximum number of in-flight requests the load balancer accepts at once.
 # New requests above this limit are rejected with HTTP 503.
 LOAD_BALANCER_MAX_IN_FLIGHT = max(1, _get_env_int("LB_MAX_IN_FLIGHT", 100))
+
+# JSON error body for overload 503; client/benchmark match on this to classify overload vs other failures.
+LOAD_BALANCER_OVERLOAD_ERROR_TEXT = "Load balancer overloaded. Try again shortly."
+
+# Label used in `requests_per_backend` counters for overload 503 responses (no X-Backend).
+LB_OVERLOAD_REQUEST_LABEL = "__overload_503__"

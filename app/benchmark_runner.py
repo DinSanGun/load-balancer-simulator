@@ -38,9 +38,17 @@ def _wait_for_lb(url: str, timeout_seconds: float = 10.0) -> None:
     raise RuntimeError(f"Load balancer did not become ready: {url}")
 
 
-def _start_load_balancer(strategy: str, host: str, port: int) -> subprocess.Popen[bytes]:
+def _start_load_balancer(
+    strategy: str,
+    host: str,
+    port: int,
+    *,
+    lb_max_in_flight: int | None = None,
+) -> subprocess.Popen[bytes]:
     env = os.environ.copy()
     env["LB_STRATEGY"] = strategy
+    if lb_max_in_flight is not None:
+        env["LB_MAX_IN_FLIGHT"] = str(lb_max_in_flight)
     # Start uvicorn as a child process so runner can benchmark each strategy
     # under the same scenario, one after another.
     return subprocess.Popen(
@@ -122,10 +130,12 @@ def _aggregate_runs(strategy: str, runs: list[SimulationResult]) -> dict[str, ob
     total_requests = sum(r.total_requests for r in runs)
     successes = sum(r.successful_requests for r in runs)
     failures = sum(r.failed_requests for r in runs)
+    overloads = sum(r.overload_rejected_requests for r in runs)
     avg_response = sum(r.average_response_time_ms for r in runs) / len(runs)
     min_response = min(r.min_response_time_ms for r in runs)
     max_response = max(r.max_response_time_ms for r in runs)
     avg_throughput = sum(r.throughput_rps for r in runs) / len(runs)
+    avg_success_throughput = sum(r.successful_throughput_rps for r in runs) / len(runs)
 
     distribution: dict[str, int] = {}
     for run in runs:
@@ -138,10 +148,12 @@ def _aggregate_runs(strategy: str, runs: list[SimulationResult]) -> dict[str, ob
         "total_requests": total_requests,
         "successful_requests": successes,
         "failed_requests": failures,
+        "overload_rejected_requests": overloads,
         "average_response_time_ms": round(avg_response, 3),
         "min_response_time_ms": round(min_response, 3),
         "max_response_time_ms": round(max_response, 3),
         "average_throughput_rps": round(avg_throughput, 3),
+        "successful_throughput_rps": round(avg_success_throughput, 3),
         "requests_per_backend": distribution,
     }
 
@@ -156,6 +168,7 @@ def run_benchmarks(
     port: int,
     progress_every: int,
     scenario: BenchmarkScenario | None = None,
+    lb_max_in_flight: int | None = None,
 ) -> dict[str, object]:
     target_url = _build_target_url(host, port, path)
     all_results: dict[str, list[SimulationResult]] = {s: [] for s in STRATEGIES}
@@ -169,7 +182,12 @@ def run_benchmarks(
         for strategy in STRATEGIES:
             for rep in range(1, repetitions + 1):
                 print(f"Running strategy={strategy} repetition={rep}/{repetitions} ...")
-                proc = _start_load_balancer(strategy=strategy, host=host, port=port)
+                proc = _start_load_balancer(
+                    strategy=strategy,
+                    host=host,
+                    port=port,
+                    lb_max_in_flight=lb_max_in_flight,
+                )
                 try:
                     _wait_for_lb(target_url)
                     result = run_simulation(
@@ -199,6 +217,7 @@ def run_benchmarks(
         "target_host": host,
         "target_port": port,
         "backends_started_by_runner": scenario is not None,
+        "load_balancer_max_in_flight": lb_max_in_flight,
     }
 
     out: dict[str, object] = {
@@ -233,10 +252,12 @@ def save_outputs(summary: dict[str, object]) -> tuple[Path, Path]:
                 "total_requests",
                 "successful_requests",
                 "failed_requests",
+                "overload_rejected_requests",
                 "average_response_time_ms",
                 "min_response_time_ms",
                 "max_response_time_ms",
                 "average_throughput_rps",
+                "successful_throughput_rps",
                 "requests_per_backend",
             ]
         )
@@ -250,10 +271,12 @@ def save_outputs(summary: dict[str, object]) -> tuple[Path, Path]:
                     row["total_requests"],
                     row["successful_requests"],
                     row["failed_requests"],
+                    row["overload_rejected_requests"],
                     row["average_response_time_ms"],
                     row["min_response_time_ms"],
                     row["max_response_time_ms"],
                     row["average_throughput_rps"],
+                    row["successful_throughput_rps"],
                     json.dumps(row["requests_per_backend"], sort_keys=True),
                 ]
             )
@@ -291,6 +314,15 @@ def parse_args() -> argparse.Namespace:
         default=100,
         help="Print progress every N completed requests per run (0 disables, default: 100)",
     )
+    parser.add_argument(
+        "--lb-max-in-flight",
+        type=int,
+        default=None,
+        help=(
+            "If set, each benchmark load balancer process uses this LB_MAX_IN_FLIGHT "
+            "(lower + higher --concurrency triggers 503 overload). Omit for default (100)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -314,6 +346,8 @@ def main() -> None:
         raise ValueError("--repetitions must be > 0")
     if args.progress_every < 0:
         raise ValueError("--progress-every must be 0 or greater")
+    if args.lb_max_in_flight is not None and args.lb_max_in_flight < 1:
+        raise ValueError("--lb-max-in-flight must be >= 1 when provided")
 
     summary = run_benchmarks(
         total_requests=args.requests,
@@ -325,6 +359,7 @@ def main() -> None:
         port=args.port,
         progress_every=args.progress_every,
         scenario=scenario_obj,
+        lb_max_in_flight=args.lb_max_in_flight,
     )
     json_path, csv_path = save_outputs(summary)
 
@@ -338,7 +373,8 @@ def main() -> None:
         print(
             f"- {row['strategy']}: avg={row['average_response_time_ms']} ms, "
             f"throughput={row['average_throughput_rps']} req/s, "
-            f"success={row['successful_requests']}/{row['total_requests']}"
+            f"success={row['successful_requests']}/{row['total_requests']}, "
+            f"overload_503={row['overload_rejected_requests']}"
         )
 
 

@@ -47,10 +47,13 @@ def _subtitle_meta(data: dict[str, object]) -> str:
     if isinstance(bp, dict):
         tr = bp.get("total_requests_per_run")
         conc = bp.get("concurrency")
+        lb_cap = bp.get("load_balancer_max_in_flight")
         if tr is not None:
             parts.append(f"requests/run={tr}")
         if conc is not None:
             parts.append(f"concurrency={conc}")
+        if lb_cap is not None:
+            parts.append(f"LB_MAX_IN_FLIGHT={lb_cap}")
     gen = data.get("generated_at")
     if gen:
         parts.append(str(gen))

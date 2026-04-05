@@ -56,6 +56,19 @@ SCENARIOS: dict[str, BenchmarkScenario] = {
             "backend-3": BackendBehavior(fixed_delay_ms=50, jitter_ms=220, failure_rate=0.0),
         },
     ),
+    "overload_saturation": BenchmarkScenario(
+        name="overload_saturation",
+        description=(
+            "Very fast backends (minimal delay) so responses complete quickly; pair with "
+            "`--lb-max-in-flight` (e.g. 8–20) and `--concurrency` above that limit to saturate the "
+            "load balancer and record HTTP 503 overload rejections in benchmark output."
+        ),
+        backends={
+            "backend-1": BackendBehavior(fixed_delay_ms=5, jitter_ms=5, failure_rate=0.0),
+            "backend-2": BackendBehavior(fixed_delay_ms=5, jitter_ms=5, failure_rate=0.0),
+            "backend-3": BackendBehavior(fixed_delay_ms=5, jitter_ms=5, failure_rate=0.0),
+        },
+    ),
 }
 
 
