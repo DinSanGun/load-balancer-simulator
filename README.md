@@ -8,7 +8,7 @@ A small **local, educational** Python project: a FastAPI reverse-proxy load bala
 - **Overload protection (fail-fast)**: configurable max in-flight requests at the balancer; excess requests are rejected with HTTP 503 (`LB_MAX_IN_FLIGHT`).
 - **Backend behavior simulation**: per-backend fixed delay, jitter, and failure rate (environment-driven, `app/config.py` + `app/backend_server.py`).
 - **Scenario-based benchmarking**: named presets (`app/benchmark_scenarios.py`); the benchmark runner can start backends for you (`--scenario`).
-- **Benchmark overload capture**: per-strategy counts for HTTP `503` overload rejections vs other failures, plus success-only throughput (`overload_rejected_requests`, `successful_throughput_rps`); optional `--lb-max-in-flight` on the runner to saturate the balancer locally.
+- **Benchmark overload capture**: per-strategy counts for HTTP `503` overload rejections vs other failures, plus success-only throughput (`overload_rejected_requests`, `successful_throughput_rps`); optional `--lb-max-in-flight` on the runner to saturate the balancer locally; matplotlib output adds overload context and an optional **`_overload_503.png`** chart when rejections occur ([Overload saturation demo](#overload-saturation-demo)).
 - **Self-describing benchmark JSON**: scenario metadata, workload parameters, and per-strategy metrics ([Results](#results); structure in [Benchmark outputs](#benchmark-all-strategies-same-workload)).
 - **Chart export**: matplotlib CLI turns `benchmark_summary_*.json` into PNG charts ([Visualizing benchmark results](#visualizing-benchmark-results); committed samples under [`examples/`](examples/README.md)).
 - **Automated tests**: pytest—unit (strategies), integration-style (balancer), smoke (benchmark output shape) ([Automated testing](#automated-testing)).
@@ -185,21 +185,45 @@ python -m app.visualize_results results/benchmark_summary_YYYYMMDD_HHMMSS.json -
 python -m app.visualize_results "$(ls -t results/benchmark_summary_*.json | head -1)"
 ```
 
-**Different experiments = different benchmark runs.** Change `--scenario`, `--requests`, `--concurrency`, `--timeout`, or backend setup (manual mode), run the benchmark again, then point `visualize_results` at the new `benchmark_summary_*.json`. Each visualization produces three PNGs **prefixed with that JSON’s stem**, so results from multiple experiments stay separate in `charts/`.
+**Different experiments = different benchmark runs.** Change `--scenario`, `--requests`, `--concurrency`, `--timeout`, or backend setup (manual mode), run the benchmark again, then point `visualize_results` at the new `benchmark_summary_*.json`. Each visualization produces **three or four** PNGs **prefixed with that JSON’s stem** (see table below), so results from multiple experiments stay separate in `charts/`.
 
 </details>
 
-### Outputs (three PNG files per input JSON)
+### Outputs (PNG files per input JSON)
 
 | File suffix | Chart |
 |-------------|--------|
 | `_response_time.png` | Bar chart: **average response time (ms)** per strategy |
-| `_throughput.png` | Bar chart: **average throughput (req/s)** per strategy |
-| `_backend_distribution.png` | Grouped bar chart: **request counts per backend**, one group per strategy |
+| `_throughput.png` | Bar chart: **offered load** (req/s) per strategy; when overload data exists, y-axis label notes it includes rejected requests |
+| `_backend_distribution.png` | Grouped bar chart: **request counts per backend** (and **Overload 503 (LB)** when present), one group per strategy |
+| `_overload_503.png` | **Only when** the sum of `overload_rejected_requests` across strategies is **> 0**: bar chart of **HTTP 503 overload rejections** per strategy |
 
-Each chart includes a **color legend below the plot** (outside the axes) so labels never cover the bars: strategy name on the first two charts, backend name on the distribution chart.
+Subtitle metadata on all figures includes **scenario**, **requests/run**, **concurrency**, optional **`LB_MAX_IN_FLIGHT`** from the JSON, and (when applicable) **total HTTP 503 overload** rejections summed across strategies.
+
+Each chart includes a **color legend below the plot** (outside the axes) so labels never cover the bars: strategy name on the first charts, backend or overload bucket on the distribution chart.
 
 Titles include the **scenario name** (if present in the JSON) and a short subtitle with request count, concurrency, and `generated_at` when available. Generated PNGs under the repo-root `charts/` directory are gitignored (see `.gitignore`); committed demo charts live under [`examples/`](examples/README.md).
+
+### Overload saturation demo
+
+Run a benchmark that is likely to trigger fail-fast overload responses, then visualize:
+
+```bash
+source .venv/bin/activate
+python -m app.benchmark_runner --scenario overload_saturation --lb-max-in-flight 10 --requests 800 --concurrency 40 --repetitions 1
+python -m app.visualize_results "$(ls -t results/benchmark_summary_*.json | head -1)"
+```
+
+**What to look for in results**
+
+- **JSON / CSV**: per-strategy `overload_rejected_requests`, `successful_throughput_rps` vs offered `average_throughput_rps`, and `benchmark_parameters.load_balancer_max_in_flight`.
+- **Charts**: subtitle shows **`LB_MAX_IN_FLIGHT`** and **total HTTP 503 overload**; **offered load** chart reflects total request completion rate (including rejections); **backend distribution** shows an **Overload 503 (LB)** bucket when rejections occurred; when totals are non-zero, a fourth chart **`_overload_503.png`** compares overload rejections per strategy.
+
+A **minimal checked-in sample** (illustrative JSON + CSV + PNGs) lives under [`examples/overload_saturation/`](examples/overload_saturation/benchmark_summary.json) so you can open charts without running a saturated benchmark.
+
+Example overload chart (from that sample):
+
+![HTTP 503 overload rejections by strategy (sample)](examples/overload_saturation/benchmark_summary_overload_503.png)
 
 ## Project structure
 

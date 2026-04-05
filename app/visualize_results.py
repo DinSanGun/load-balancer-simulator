@@ -41,6 +41,21 @@ def _title_prefix(data: dict[str, object]) -> str:
     return "Benchmark (no named scenario)"
 
 
+def _strategy_rows(data: dict[str, object]) -> list[dict[str, object]]:
+    rows = data.get("strategies")
+    if not isinstance(rows, list):
+        return []
+    return [r for r in rows if isinstance(r, dict)]
+
+
+def _total_overload_rejections(data: dict[str, object]) -> int:
+    return sum(int(r.get("overload_rejected_requests") or 0) for r in _strategy_rows(data))
+
+
+def _has_overload_metrics(data: dict[str, object]) -> bool:
+    return _total_overload_rejections(data) > 0
+
+
 def _subtitle_meta(data: dict[str, object]) -> str:
     parts: list[str] = []
     bp = data.get("benchmark_parameters")
@@ -54,10 +69,19 @@ def _subtitle_meta(data: dict[str, object]) -> str:
             parts.append(f"concurrency={conc}")
         if lb_cap is not None:
             parts.append(f"LB_MAX_IN_FLIGHT={lb_cap}")
+    tot_ol = _total_overload_rejections(data)
+    if tot_ol > 0:
+        parts.append(f"total HTTP 503 overload={tot_ol}")
     gen = data.get("generated_at")
     if gen:
         parts.append(str(gen))
     return " · ".join(parts) if parts else ""
+
+
+def _format_backend_legend_label(key: str) -> str:
+    if key == "__overload_503__":
+        return "Overload 503 (LB)"
+    return key
 
 
 def load_benchmark_json(path: Path) -> dict[str, object]:
@@ -154,9 +178,37 @@ def plot_average_throughput(data: dict[str, object], out_path: Path) -> None:
     colors = STRATEGY_COLORS[: len(labels)]
     fig, ax = plt.subplots(figsize=(8, 6.2))
     bars = ax.bar(labels, values, color=colors)
-    ax.set_ylabel("Average throughput (req/s)")
-    _apply_figure_titles(fig, data, "Average throughput by strategy")
+    if _has_overload_metrics(data):
+        ax.set_ylabel("Offered load (req/s)")
+        thr_title = "Offered load by strategy (includes rejected requests)"
+    else:
+        ax.set_ylabel("Average throughput (req/s)")
+        thr_title = "Average throughput by strategy"
+    _apply_figure_titles(fig, data, thr_title)
     ax.bar_label(bars, fmt="%.2f", padding=4)
+    plt.setp(ax.get_xticklabels(), rotation=0, ha="center")
+    _add_legend_below_axes(ax, "Strategy", list(zip(labels, colors)))
+    _finalize_bar_figure(fig, ax, bottom=0.30)
+    fig.savefig(out_path, dpi=120, bbox_inches="tight", pad_inches=0.35)
+    plt.close(fig)
+
+
+def plot_overload_rejections(data: dict[str, object], out_path: Path) -> None:
+    """Bar chart of fail-fast 503 overload rejections per strategy (only meaningful when totals > 0)."""
+    rows = data["strategies"]
+    labels = [_format_strategy_label(str(r["strategy"])) for r in rows]
+    values = [int(r.get("overload_rejected_requests") or 0) for r in rows]
+
+    colors = STRATEGY_COLORS[: len(labels)]
+    fig, ax = plt.subplots(figsize=(8, 6.2))
+    bars = ax.bar(labels, values, color=colors)
+    ax.set_ylabel("Overload rejections (count)")
+    _apply_figure_titles(
+        fig,
+        data,
+        "HTTP 503 overload rejections by strategy (fail-fast backpressure)",
+    )
+    ax.bar_label(bars, fmt="%d", padding=4)
     plt.setp(ax.get_xticklabels(), rotation=0, ha="center")
     _add_legend_below_axes(ax, "Strategy", list(zip(labels, colors)))
     _finalize_bar_figure(fig, ax, bottom=0.30)
@@ -198,7 +250,7 @@ def plot_backend_distribution(data: dict[str, object], out_path: Path) -> None:
     ax.set_xticks(x_positions)
     ax.set_xticklabels(strategy_labels, rotation=0, ha="center")
     _apply_figure_titles(fig, data, "Requests per backend by strategy")
-    legend_entries = [(backend, colors[i]) for i, backend in enumerate(all_backends)]
+    legend_entries = [(_format_backend_legend_label(backend), colors[i]) for i, backend in enumerate(all_backends)]
     _add_legend_below_axes(ax, "Backend", legend_entries)
     for c in bars_list:
         ax.bar_label(c, padding=3, fontsize=8)
@@ -227,6 +279,11 @@ def run_visualization(input_path: Path, output_dir: Path) -> list[Path]:
     plot_average_response_time(data, paths[0])
     plot_average_throughput(data, paths[1])
     plot_backend_distribution(data, paths[2])
+
+    if _has_overload_metrics(data):
+        ol_path = output_dir / f"{prefix}_overload_503.png"
+        plot_overload_rejections(data, ol_path)
+        paths.append(ol_path)
 
     return paths
 

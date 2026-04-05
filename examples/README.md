@@ -21,6 +21,7 @@ Each subdirectory is one **named scenario** (see `app/benchmark_scenarios.py`). 
 | `benchmark_summary_response_time.png` | Bar chart: average response time (ms) per strategy. |
 | `benchmark_summary_throughput.png` | Bar chart: average throughput (req/s) per strategy. |
 | `benchmark_summary_backend_distribution.png` | Grouped bars: request counts per backend per strategy. |
+| `benchmark_summary_overload_503.png` | *(Overload runs only.)* Bar chart: HTTP 503 overload rejections per strategy. |
 
 ## Scenarios included
 
@@ -29,6 +30,7 @@ Each subdirectory is one **named scenario** (see `app/benchmark_scenarios.py`). 
 | `balanced/` | `balanced` | Similar backends; moderate delay and jitter; no simulated failures. |
 | `flaky_backend/` | `flaky_backend` | One backend with intermittent simulated HTTP 500 responses. |
 | `one_slow_backend/` | `one_slow_backend` | One backend much slower than the others. |
+| `overload_saturation/` | `overload_saturation` | Illustrative overload sample: fast backends + low `LB_MAX_IN_FLIGHT`; includes `overload_rejected_requests` and a fourth overload chart. |
 
 ## Regenerate charts from the JSON
 
@@ -41,4 +43,10 @@ python -m app.visualize_results examples/balanced/benchmark_summary.json -o exam
 
 ## Note on success counts
 
-Occasional **failed** client requests can appear under real timing (timeouts, short runs). The JSON files record exact `successful_requests` / `failed_requests` per strategy.
+Occasional **failed** client requests can appear under real timing (timeouts, short runs). The JSON files record exact `successful_requests` / `failed_requests` per strategy. Overload-saturated runs also record **`overload_rejected_requests`** (fail-fast 503 from the load balancer) and may include a fourth chart `benchmark_summary_overload_503.png`.
+
+Regenerate the overload example charts:
+
+```bash
+python -m app.visualize_results examples/overload_saturation/benchmark_summary.json -o examples/overload_saturation
+```

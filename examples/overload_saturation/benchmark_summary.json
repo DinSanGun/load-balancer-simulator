@@ -1,0 +1,81 @@
+{
+  "generated_at": "2026-04-05T12:00:00Z",
+  "scenario_name": "overload_saturation",
+  "scenario_description": "Very fast backends (minimal delay); pair with --lb-max-in-flight and high --concurrency to saturate the load balancer and record HTTP 503 overload rejections in benchmark output.",
+  "backend_behaviors": {
+    "backend-1": {"fixed_delay_ms": 5, "jitter_ms": 5, "failure_rate": 0.0},
+    "backend-2": {"fixed_delay_ms": 5, "jitter_ms": 5, "failure_rate": 0.0},
+    "backend-3": {"fixed_delay_ms": 5, "jitter_ms": 5, "failure_rate": 0.0}
+  },
+  "benchmark_parameters": {
+    "total_requests_per_run": 800,
+    "concurrency": 40,
+    "path": "/",
+    "timeout_seconds": 3.0,
+    "repetitions_per_strategy": 1,
+    "target_host": "127.0.0.1",
+    "target_port": 8000,
+    "backends_started_by_runner": true,
+    "load_balancer_max_in_flight": 10
+  },
+  "strategies": [
+    {
+      "strategy": "round_robin",
+      "repetitions": 1,
+      "total_requests": 800,
+      "successful_requests": 612,
+      "failed_requests": 0,
+      "overload_rejected_requests": 188,
+      "average_response_time_ms": 12.4,
+      "min_response_time_ms": 2.1,
+      "max_response_time_ms": 45.2,
+      "average_throughput_rps": 210.5,
+      "successful_throughput_rps": 161.0,
+      "requests_per_backend": {
+        "backend-1": 204,
+        "backend-2": 204,
+        "backend-3": 204,
+        "__overload_503__": 188
+      }
+    },
+    {
+      "strategy": "least_connections",
+      "repetitions": 1,
+      "total_requests": 800,
+      "successful_requests": 625,
+      "failed_requests": 0,
+      "overload_rejected_requests": 175,
+      "average_response_time_ms": 11.8,
+      "min_response_time_ms": 2.0,
+      "max_response_time_ms": 42.0,
+      "average_throughput_rps": 215.2,
+      "successful_throughput_rps": 168.1,
+      "requests_per_backend": {
+        "backend-1": 210,
+        "backend-2": 208,
+        "backend-3": 207,
+        "__overload_503__": 175
+      }
+    },
+    {
+      "strategy": "least_response_time",
+      "repetitions": 1,
+      "total_requests": 800,
+      "successful_requests": 618,
+      "failed_requests": 0,
+      "overload_rejected_requests": 182,
+      "average_response_time_ms": 12.1,
+      "min_response_time_ms": 2.2,
+      "max_response_time_ms": 44.0,
+      "average_throughput_rps": 212.0,
+      "successful_throughput_rps": 163.8,
+      "requests_per_backend": {
+        "backend-1": 206,
+        "backend-2": 206,
+        "backend-3": 206,
+        "__overload_503__": 182
+      }
+    }
+  ],
+  "raw_runs": {}
+}

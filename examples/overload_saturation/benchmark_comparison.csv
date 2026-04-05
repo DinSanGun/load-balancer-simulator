@@ -1,0 +1,4 @@
+scenario_name,strategy,repetitions,total_requests,successful_requests,failed_requests,overload_rejected_requests,average_response_time_ms,min_response_time_ms,max_response_time_ms,average_throughput_rps,successful_throughput_rps,requests_per_backend
+overload_saturation,round_robin,1,800,612,0,188,12.4,2.1,45.2,210.5,161.0,"{""backend-1"": 204, ""backend-2"": 204, ""backend-3"": 204, ""__overload_503__"": 188}"
+overload_saturation,least_connections,1,800,625,0,175,11.8,2.0,42.0,215.2,168.1,"{""backend-1"": 210, ""backend-2"": 208, ""backend-3"": 207, ""__overload_503__"": 175}"
+overload_saturation,least_response_time,1,800,618,0,182,12.1,2.2,44.0,212.0,163.8,"{""backend-1"": 206, ""backend-2"": 206, ""backend-3"": 206, ""__overload_503__"": 182}"
