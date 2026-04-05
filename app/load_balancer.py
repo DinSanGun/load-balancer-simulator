@@ -4,8 +4,9 @@ import logging
 import threading
 
 import requests
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from .config import (
     BACKENDS,
@@ -14,16 +15,26 @@ from .config import (
     LOAD_BALANCER_MAX_IN_FLIGHT,
     LOAD_BALANCER_OVERLOAD_ERROR_TEXT,
 )
-from .healthcheck import filter_healthy_backends
+from .healthcheck import filter_healthy_backends, tcp_is_reachable
 from .strategies import LoadBalancingStrategy, build_strategy
 
 
 logger = logging.getLogger("load_balancer")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+# Explicit strategy names accepted by the control plane (matches build_strategy routing).
+VALID_CONTROL_STRATEGIES: frozenset[str] = frozenset(
+    ("round_robin", "least_connections", "least_response_time")
+)
+
 app = FastAPI(title="Load Balancer (MVP)")
-strategy: LoadBalancingStrategy = build_strategy(LOAD_BALANCING_STRATEGY)
-logger.info("Active strategy: %s", LOAD_BALANCING_STRATEGY)
+
+_strategy_lock = threading.Lock()
+active_strategy_name: str = LOAD_BALANCING_STRATEGY.strip().lower()
+strategy: LoadBalancingStrategy = build_strategy(active_strategy_name)
+logger.info("Active strategy: %s", active_strategy_name)
+
+control_router = APIRouter(prefix="/control", tags=["control-plane"])
 
 
 class OverloadState:
@@ -66,6 +77,14 @@ class OverloadState:
             self.active_requests = 0
             self.rejected_requests_total = 0
             self.peak_active_requests = 0
+
+    def set_max_in_flight(self, value: int) -> int:
+        """Update the admission limit at runtime (process-local)."""
+        if value < 1:
+            raise ValueError("max_in_flight must be >= 1")
+        with self._lock:
+            self.max_in_flight = value
+        return value
 
 
 overload_state = OverloadState(max_in_flight=LOAD_BALANCER_MAX_IN_FLIGHT)
@@ -123,22 +142,25 @@ def root() -> JSONResponse:
                 content={"error": "No healthy backends available"},
             )
 
-        backend = strategy.choose_backend(healthy)
-        request_ctx = strategy.on_request_start(backend)
+        with _strategy_lock:
+            current_strategy = strategy
+
+        backend = current_strategy.choose_backend(healthy)
+        request_ctx = current_strategy.on_request_start(backend)
 
         try:
             status_code, payload = _forward_get_root(backend)
         except requests.RequestException as e:
             # A backend can become unreachable between the TCP check and the HTTP call.
             # Keep the MVP behavior simple: return a 502.
-            strategy.on_request_end(backend, request_ctx, success=False)
+            current_strategy.on_request_end(backend, request_ctx, success=False)
             logger.warning("Forwarding failed to %s (%s:%s): %s", backend.name, backend.host, backend.port, e)
             return JSONResponse(
                 status_code=502,
                 content={"error": "Backend request failed", "backend": backend.name},
             )
         else:
-            strategy.on_request_end(backend, request_ctx, success=True)
+            current_strategy.on_request_end(backend, request_ctx, success=True)
 
         logger.info("Routed request to %s (%s:%s)", backend.name, backend.host, backend.port)
 
@@ -155,9 +177,93 @@ def root() -> JSONResponse:
 @app.get("/lb/status")
 def lb_status() -> JSONResponse:
     """Minimal local status endpoint for strategy + overload counters."""
+    with _strategy_lock:
+        name = active_strategy_name
     data = {
-        "strategy": LOAD_BALANCING_STRATEGY,
+        "strategy": name,
         **overload_state.snapshot(),
     }
     return JSONResponse(status_code=200, content=data)
+
+
+class StrategyUpdateBody(BaseModel):
+    strategy: str = Field(..., min_length=1, description="One of: round_robin, least_connections, least_response_time")
+
+
+class MaxInFlightBody(BaseModel):
+    max_in_flight: int = Field(..., ge=1, le=1_000_000, description="Max concurrent in-flight requests at the load balancer")
+
+
+@control_router.get("/status")
+def control_status() -> JSONResponse:
+    """
+    Demo-friendly unified status (process-local control plane MVP).
+    Separate from the data-plane forwarding path; useful for demos and inspection.
+    """
+    with _strategy_lock:
+        strat = active_strategy_name
+    backends = [
+        {
+            "name": b.name,
+            "host": b.host,
+            "port": b.port,
+            "tcp_reachable": tcp_is_reachable(b),
+        }
+        for b in BACKENDS
+    ]
+    payload = {
+        "layer": "control_plane_mvp",
+        "scope": "process_local",
+        "note": "Educational demo only: no auth, no persistence, not for production.",
+        "active_strategy": strat,
+        "backends": backends,
+        **overload_state.snapshot(),
+    }
+    return JSONResponse(status_code=200, content=payload)
+
+
+@control_router.post("/strategy")
+def control_set_strategy(body: StrategyUpdateBody) -> JSONResponse:
+    """Switch routing strategy at runtime (in-process)."""
+    global strategy, active_strategy_name
+
+    key = body.strategy.strip().lower()
+    if key not in VALID_CONTROL_STRATEGIES:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_strategy",
+                "message": f"Must be one of: {sorted(VALID_CONTROL_STRATEGIES)}",
+                "allowed": sorted(VALID_CONTROL_STRATEGIES),
+            },
+        )
+
+    new_strategy = build_strategy(key)
+    with _strategy_lock:
+        strategy = new_strategy
+        active_strategy_name = key
+
+    logger.info("Control plane: active strategy set to %s", key)
+    return JSONResponse(
+        status_code=200,
+        content={"active_strategy": key, "message": "Strategy updated"},
+    )
+
+
+@control_router.post("/max-in-flight")
+def control_set_max_in_flight(body: MaxInFlightBody) -> JSONResponse:
+    """Update max in-flight admission limit at runtime (in-process)."""
+    overload_state.set_max_in_flight(body.max_in_flight)
+    snap = overload_state.snapshot()
+    logger.info("Control plane: max_in_flight set to %s", body.max_in_flight)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "max_in_flight_requests": snap["max_in_flight_requests"],
+            "message": "Max in-flight limit updated",
+        },
+    )
+
+
+app.include_router(control_router)
 

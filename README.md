@@ -75,7 +75,13 @@ The project simulates routing HTTP `GET` traffic from a single load balancer ent
 - TCP socket reachability checks before routing; unreachable backends are skipped.
 - Strategy pluggable via `LB_STRATEGY`: `round_robin`, `least_connections`, `least_response_time`.
 - Overload guard via `LB_MAX_IN_FLIGHT` (default `100`): when active in-flight requests hit the limit, new requests fail fast with HTTP `503`.
-- `GET /lb/status` — minimal local status/metrics (`active_requests`, `rejected_requests_total`, `peak_active_requests`, `max_in_flight_requests`).
+- `GET /lb/status` — minimal local status/metrics (`active_requests`, `rejected_requests_total`, `peak_active_requests`, `max_in_flight_requests`); **`strategy`** reflects the **current** in-process strategy (including changes from the control plane below).
+
+**Control plane MVP (local demo)** — process-local, no auth/persistence; not production orchestration. See [Control plane MVP](#control-plane-mvp-local-demo).
+
+- `GET /control/status` — unified JSON: active strategy, overload snapshot, per-backend TCP reachability.
+- `POST /control/strategy` — JSON body `{"strategy": "round_robin" | "least_connections" | "least_response_time"}` to switch routing at runtime.
+- `POST /control/max-in-flight` — JSON body `{"max_in_flight": <int>}` to change the admission limit at runtime.
 
 **Client simulator**
 
@@ -353,6 +359,34 @@ Optional overload limit (fail-fast `503` when exceeded):
 source .venv/bin/activate
 LB_MAX_IN_FLIGHT=50 uvicorn app.load_balancer:app --host 127.0.0.1 --port 8000
 ```
+
+### Control plane MVP (local demo)
+
+A tiny **process-local** API for demos: inspect state and adjust strategy or max in-flight **without** restarting uvicorn. This is **educational only** (no authentication, no persistence, not a substitute for the fuller “control plane” direction in project planning).
+
+**Unified status** (strategy, overload counters, per-backend TCP reachability):
+
+```bash
+curl -s http://127.0.0.1:8000/control/status | python -m json.tool
+```
+
+**Switch strategy at runtime** (same allowed names as `LB_STRATEGY`):
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/control/strategy \
+  -H "Content-Type: application/json" \
+  -d '{"strategy":"least_connections"}' | python -m json.tool
+```
+
+**Change max in-flight limit** (must be ≥ 1):
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/control/max-in-flight \
+  -H "Content-Type: application/json" \
+  -d '{"max_in_flight":30}' | python -m json.tool
+```
+
+Invalid strategy names return **400** with an `allowed` list; invalid `max_in_flight` values return **422** validation errors. The legacy **`GET /lb/status`** endpoint remains; it now reports the **current** active strategy after any control-plane update.
 
 ## Run the client simulator
 

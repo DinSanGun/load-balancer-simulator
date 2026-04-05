@@ -19,6 +19,7 @@ class _FakeResponse:
 def setup_function() -> None:
     lb.overload_state.reset_for_tests(max_in_flight=100)
     lb.strategy = RoundRobinStrategy()
+    lb.active_strategy_name = "round_robin"
 
 
 def test_forwards_requests_to_healthy_backend(monkeypatch) -> None:
